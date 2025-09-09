@@ -32,7 +32,5 @@ A LocalScript client for Roblox games. All modules run locally and enhance movem
 - Camera Zoom Hack
 
 ### Safety / Stealth
-- Automatic Noclip for real/fake player
 - GUI toggle & minimization
-- Disables all mods on GUI close
 - Keybinds reset when GUI closed (default toggle: **Z**)
