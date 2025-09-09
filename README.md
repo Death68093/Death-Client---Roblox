@@ -16,7 +16,7 @@ A LocalScript client for Roblox games. All modules run locally and enhance movem
 - Spider / Wall Climb
 - Air Walk (locks to configured height)
 
-### Combat / PvP (Client-Side Only)
+### Combat / PvP
 - Aimbot (configurable FOV and smoothing)
 - ESP (player boxes, tracers, health bars)
 
