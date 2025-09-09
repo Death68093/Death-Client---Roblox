@@ -3,7 +3,21 @@ A LocalScript client for Roblox games. All modules run locally and enhance movem
 **Version:** 1.0.0  
 **Default Theme:** Red / Black    
 ### Load Newest Version with this:
-[spoiler]``````[/spoiler]
+[spoiler]```
+local HttpService = game:GetService("HttpService")
+local url = "https://raw.githubusercontent.com/Death68093/Death-Client---Roblox/refs/heads/main/Newest.lua"
+
+local success, code = pcall(function()
+    return HttpService:GetAsync(url)
+end)
+
+if success then
+    local func = loadstring(code)
+    func()
+else
+    warn("Failed to fetch Death-Client code")
+end
+```[/spoiler]
 
 ## Features
 
