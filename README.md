@@ -2,8 +2,8 @@
 A LocalScript client for Roblox games. All modules run locally and enhance movement, visuals, and utility for the player.  
 **Version:** 1.0.0  
 **Default Theme:** Red / Black    
-
----
+### Load Newest Version with this:
+[spoiler]``````[/spoiler]
 
 ## Features
 
