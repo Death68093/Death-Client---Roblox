@@ -1,13 +1,3 @@
--- Death's Control Menu (refactor)
--- Single-file LocalScript (client)
--- Key improvements:
--- 1) No event/instance creation inside RenderStepped
--- 2) State-change only updates (debounced updates)
--- 3) Adornments cached and reused
--- 4) Fly uses BodyVelocity (clean enable/disable)
--- 5) Config deep-merge; client avoids direct DataStore usage (use RemoteEvent on server)
--- 6) UI placed into PlayerGui when testing; CoreGui otherwise (subject to client permissions)
-
 -- Services
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
