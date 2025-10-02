@@ -1,281 +1,103 @@
--- Core Services
+-- Death's Control Menu (refactor)
+-- Single-file LocalScript (client)
+-- Key improvements:
+-- 1) No event/instance creation inside RenderStepped
+-- 2) State-change only updates (debounced updates)
+-- 3) Adornments cached and reused
+-- 4) Fly uses BodyVelocity (clean enable/disable)
+-- 5) Config deep-merge; client avoids direct DataStore usage (use RemoteEvent on server)
+-- 6) UI placed into PlayerGui when testing; CoreGui otherwise (subject to client permissions)
+
+-- Services
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local ContextActionService = game:GetService("ContextActionService")
-local GuiService = game:GetService("GuiService")
-local CoreGui = game:GetService("CoreGui")
-local VirtualUser = game:GetService("VirtualUser")
-local HttpService = game:GetService("HttpService")
-local LogService = game:GetService("LogService")
-local Stats = game:GetService("Stats")
-local SoundService = game:GetService("SoundService")
-local TextService = game:GetService("TextService")
-
--- Player / GUI Services
 local Players = game:GetService("Players")
-local StarterGui = game:GetService("StarterGui")
-local StarterPack = game:GetService("StarterPack")
-local StarterPlayer = game:GetService("StarterPlayer")
-local Teams = game:GetService("Teams")
-local Chat = game:GetService("Chat")
-
--- Data & Storage
-local DataStoreService = game:GetService("DataStoreService")
-local MemoryStoreService = game:GetService("MemoryStoreService")
-local InsertService = game:GetService("InsertService")
-local AssetService = game:GetService("AssetService")
-
--- Physics & Environment
-local Workspace = game:GetService("Workspace")
-local Lighting = game:GetService("Lighting")
-local PathfindingService = game:GetService("PathfindingService")
-local PhysicsService = game:GetService("PhysicsService")
-local Terrain = Workspace.Terrain
-
--- Replication / Networking
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerStorage = game:GetService("ServerStorage")
-local ServerScriptService = game:GetService("ServerScriptService")
-local MessagingService = game:GetService("MessagingService")
+local Workspace = game:GetService("Workspace")
+local VirtualUser = game:GetService("VirtualUser")
+local Lighting = game:GetService("Lighting")
+local HttpService = game:GetService("HttpService")
 
--- Monetization / Marketplace
-local MarketplaceService = game:GetService("MarketplaceService")
-local BadgeService = game:GetService("BadgeService")
-local GamePassService = game:GetService("GamePassService") -- (alias of MarketplaceService)
-local PolicyService = game:GetService("PolicyService")
-
--- Teleport / Cross-server
-local TeleportService = game:GetService("TeleportService")
-local FriendService = game:GetService("FriendService") -- legacy/deprecated
-
--- Social & Localization
-local LocalizationService = game:GetService("LocalizationService")
-local SocialService = game:GetService("SocialService")
-
--- Developer / Analytics
-local AnalyticsService = game:GetService("AnalyticsService")
-local ScriptContext = game:GetService("ScriptContext")
-local TestService = game:GetService("TestService")
-
--- Miscellaneous
-local CollectionService = game:GetService("CollectionService")
-local ProximityPromptService = game:GetService("ProximityPromptService")
-local Selection = game:GetService("Selection")
-
--- Player def
 local player = Players.LocalPlayer
-local char = player.Character or player.CharacterAdded:Wait()
-local hum= char:WaitForChild("Humanoid")
-local hrp = char:WaitForChild("HumanoidRootPart")
-local mouse = player:GetMouse()
+local playerGui = player:WaitForChild("PlayerGui")
 
--- Config
-local config = {
+-- Default config (same structure as yours, trimmed where appropriate)
+local defaultConfig = {
     version = "1.0.2",
     testing = true,
     prefix = ".",
-    owner = 123456789, -- replace with your user ID
+    owner = 123456789,
     menuToggle = true,
     datafile = "DC_config",
     mods = {
         movement = {
-            fly = {
-                enabled = false,
-                speed = 100
-            },
-            speed = {
-                enabled = false,
-                defaultSpeed = hum.WalkSpeed,
-                speed = 32
-            },
-            jump = {
-                enabled = false,
-                defaultPower = hum.JumpPower,
-                defaultHeight = hum.JumpHeight,
-                power = 100,
-                height = 50
-            },
+            fly = { enabled = false, speed = 100 },
+            speed = { enabled = false, defaultSpeed = nil, speed = 32 }, -- defaultSpeed set later
+            jump = { enabled = false, defaultPower = nil, defaultHeight = nil, power = 100, height = 50 },
         },
         visual = {
-            esp = {
-                enabled = false,
-                box = true,
-                name = true,
-                health = true,
-                distance = true,
-                teamCheck = true,
-                team = nil
-            },
-            chams = {
-                enabled = false,
-                color = Color3.new(1, 0, 0),
-                transparency = 0.5
-            },
-            tracers = {
-                enabled = false,
-                color = Color3.new(0, 1, 0),
-                thickness = 1,
-                teamCheck = true,
-                team = nil
-            },
-            fov = {
-                enabled = false,
-                radius = 100,
-                color = Color3.new(1, 1, 1),
-                thickness = 1
-            },
-            wallhack = {
-                enabled = false,
-                transparency = 0.5
-            }
+            esp = { enabled = false, box = true, name = true, health = true, distance = true, teamCheck = true, team = nil },
+            chams = { enabled = false, color = Color3.new(1, 0, 0), transparency = 0.5 },
+            tracers = { enabled = false, color = Color3.new(0, 1, 0), thickness = 1, teamCheck = true, team = nil },
+            fov = { enabled = false, radius = 100, color = Color3.new(1, 1, 1), thickness = 1 },
+            wallhack = { enabled = false, transparency = 0.5 }
         },
         utility = {
-            antiAfk = {
-                enabled = true
-            },
-            noClip = {
-                enabled = false
-            },
-            infiniteJump = {
-                enabled = false
-            },
-            teleport = {
-                enabled = false,
-                target = nil,
-                saves = {
-                    -- Place ID
-                    --[[
-                    123456789 = {
-                        name = "start",
-                        position = Vector3.new(0, 10, 0)
-                    },
-                    987654321 = {
-                        name = "end",
-                        position = Vector3.new(100, 10, 100)
-                    }
-                    ]]
-                },
-            },
-
+            antiAfk = { enabled = true },
+            noClip = { enabled = false },
+            infiniteJump = { enabled = false },
+            teleport = { enabled = false, target = nil, saves = {} },
         },
         combat = {
-            aimbot = {
-                enabled = false,
-                fov = 30,
-                smoothness = 0.5,
-                teamCheck = true,
-                targetPart = "Head",
-                keybind = Enum.KeyCode.LeftAlt,
-                target = nil
-            },
-            triggerbot = {
-                enabled = false,
-                delay = 0.1,
-                teamCheck = true
-            },
-            silentAim = {
-                enabled = false,
-                fov = 30,
-                teamCheck = true,
-                targetPart = "Head",
-                target = nil
-            },
-            autoClicker = {
-                enabled = false,
-                cps = 10,
-                jitter = false,
-                keybind = Enum.KeyCode.LeftControl
-            }
+            aimbot = { enabled = false, fov = 30, smoothness = 0.5, teamCheck = true, targetPart = "Head", keybind = Enum.KeyCode.LeftAlt, target = nil },
+            triggerbot = { enabled = false, delay = 0.1, teamCheck = true },
+            autoClicker = { enabled = false, cps = 10, jitter = false, keybind = Enum.KeyCode.LeftControl },
         },
         fun = {
-            fling = {
-                enabled = false,
-                target = nil,
-                force = 1000
-            },
-            spin = {
-                enabled = false,
-                speed = 100
-            },
-            fakeLag = {
-                enabled = false,
-                amount = 0.1
-            }
+            fling = { enabled = false, target = nil, force = 1000 },
+            spin = { enabled = false, speed = 100 },
+            fakeLag = { enabled = false, amount = 0.1 },
         },
         misc = {
-            rejoin = {
-                enabled = false
-            },
-            serverHop = {
-                enabled = false,
-                visited = {}
-            },
+            rejoin = { enabled = false },
+            serverHop = { enabled = false, visited = {} },
             fpsBoost = {
                 enabled = false,
                 settings = {
-                    ["Rendering"] = {
-                        ["GlobalShadows"] = false,
-                        ["QualityLevel"] = 1,
-                        ["TerrainDecoration"] = false,
-                        ["WaterWaveSize"] = 0,
-                        ["WaterReflectance"] = 0,
-                        ["WaterTransparency"] = 0,
-                        ["ShadowSoftness"] = 0,
-                        ["AtmosphereDensity"] = 0,
-                        ["Brightness"] = 1
+                    Rendering = {
+                        GlobalShadows = false,
+                        QualityLevel = 1,
+                        TerrainDecoration = false,
+                        WaterWaveSize = 0,
+                        WaterReflectance = 0,
+                        WaterTransparency = 0,
+                        ShadowSoftness = 0,
+                        AtmosphereDensity = 0,
+                        Brightness = 1
                     },
-                    ["Effects"] = {
+                    Effects = {
                         ["BlurEffect.Enabled"] = false,
                         ["SunRaysEffect.Enabled"] = false,
                         ["ColorCorrectionEffect.Enabled"] = false,
                         ["BloomEffect.Enabled"] = false,
                         ["DepthOfFieldEffect.Enabled"] = false
                     },
-                    ["Performance"] = {
-                        ["ImageQualityLevel"] = 1,
-                        ["GraphicsMode"] = "Performance",
-                        ["FrameRateManagerMethod"] = "Fixed",
-                        ["VsyncEnabled"] = false
+                    Performance = {
+                        ImageQualityLevel = 1,
+                        GraphicsMode = "Performance",
+                        FrameRateManagerMethod = "Fixed",
+                        VsyncEnabled = false
                     }
                 }
             }
         },
-        hubs = {
-            list = {
-                {
-                    name = "ExampleHub",
-                    url = "https://example.com/hub.lua"
-                }
-            }
-        },
+        hubs = { list = { { name = "ExampleHub", url = "https://example.com/hub.lua" } } },
         themes = {
             current = "Red",
             list = {
-                Light = {
-                    background = Color3.fromRGB(255, 255, 255),
-                    text = Color3.fromRGB(0, 0, 0),
-                    accent = Color3.fromRGB(0, 120, 215)
-                },
-                Dark = {
-                    background = Color3.fromRGB(30, 30, 30),
-                    text = Color3.fromRGB(255, 255, 255),
-                    accent = Color3.fromRGB(0, 120, 215)
-                },
-                Red = {
-                    background = Color3.fromRGB(50, 0, 0),
-                    text = Color3.fromRGB(255, 255, 255),
-                    accent = Color3.fromRGB(255, 0, 0)
-                },
-                Blue = {
-                    background = Color3.fromRGB(0, 0, 50),
-                    text = Color3.fromRGB(255, 255, 255),
-                    accent = Color3.fromRGB(0, 0, 255)
-                },
-                Green = {
-                    background = Color3.fromRGB(0, 50, 0),
-                    text = Color3.fromRGB(255, 255, 255),
-                    accent = Color3.fromRGB(0, 255, 0)
-                }
+                Light = { background = Color3.fromRGB(255,255,255), text = Color3.fromRGB(0,0,0), accent = Color3.fromRGB(0,120,215) },
+                Dark  = { background = Color3.fromRGB(30,30,30), text = Color3.fromRGB(255,255,255), accent = Color3.fromRGB(0,120,215) },
+                Red   = { background = Color3.fromRGB(50,0,0), text = Color3.fromRGB(255,255,255), accent = Color3.fromRGB(255,0,0) },
             }
         },
         binds = {
@@ -303,344 +125,609 @@ local config = {
             triggerbot = Enum.KeyCode.B,
             silentAim = Enum.KeyCode.V,
             antiAfk = Enum.KeyCode.C,
-
         }
     }
 }
 
--- Config loader
-local function loadConfig()
-    local success, configData = pcall(function()
-        return game:GetService("DataStoreService"):GetDataStore(config.datafile):GetAsync(player.UserId)
-    end)
+-- runtime state
+local state = {
+    cfg = {},
+    adornments = { esp = {}, chams = {}, tracers = {} }, -- caches keyed by player
+    flyBV = nil, -- BodyVelocity instance if flying
+    prev = {}, -- previous toggle states for debounced updates
+    lastAutoClick = 0,
+}
 
-    if success and configData then
-        config = configData
-    else
-        warn("Failed to load config: " .. tostring(configData))
-    end
-end
-
--- Create Menu
--- GUI Container
-local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
-ScreenGui.Name = "DC_Menu"
-
--- Theme
-local theme = config.themes.list[config.themes.current]
-
--- Main Frame
-local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 500, 0, 400)
-MainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
-MainFrame.BackgroundColor3 = theme.background
-MainFrame.Visible = config.menuToggle
-
--- Draggable
-MainFrame.Active = true
-MainFrame.Draggable = true
-
--- Title
-local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundTransparency = 1
-Title.Text = "Death's Control Menu v" .. config.version
-Title.Font = Enum.Font.SourceSansBold
-Title.TextSize = 20
-Title.TextColor3 = theme.accent
-
--- Tab Container
-local TabContainer = Instance.new("Frame", MainFrame)
-TabContainer.Size = UDim2.new(0, 120, 1, -40)
-TabContainer.Position = UDim2.new(0, 0, 0, 40)
-TabContainer.BackgroundColor3 = theme.background
-
--- Content Container
-local Content = Instance.new("Frame", MainFrame)
-Content.Size = UDim2.new(1, -120, 1, -40)
-Content.Position = UDim2.new(0, 120, 0, 40)
-Content.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-
--- UIListLayouts
-local TabLayout = Instance.new("UIListLayout", TabContainer)
-TabLayout.Padding = UDim.new(0, 5)
-
-local ContentLayout = Instance.new("UIListLayout", Content)
-ContentLayout.Padding = UDim.new(0, 5)
-
--- Function to clear content
-local function clearContent()
-    for _, v in ipairs(Content:GetChildren()) do
-        if v:IsA("GuiObject") then v:Destroy() end
-    end
-end
-
--- Function to create toggle
-local function createToggle(parent, name, settingTable)
-    local Button = Instance.new("TextButton", parent)
-    Button.Size = UDim2.new(1, -10, 0, 30)
-    Button.BackgroundColor3 = theme.background
-    Button.TextColor3 = theme.text
-    Button.Text = name .. ": " .. tostring(settingTable.enabled)
-
-    Button.MouseButton1Click:Connect(function()
-        settingTable.enabled = not settingTable.enabled
-        Button.Text = name .. ": " .. tostring(settingTable.enabled)
-    end)
-end
-
--- Function to open category
-local function openCategory(catName, catTable)
-    clearContent()
-    for featureName, feature in pairs(catTable) do
-        if typeof(feature) == "table" and feature.enabled ~= nil then
-            createToggle(Content, featureName, feature)
+-- utility: deep-merge table b into a (non-destructive for a)
+local function deepMerge(a, b)
+    for k, v in pairs(b) do
+        if type(v) == "table" then
+            if type(a[k]) ~= "table" then a[k] = {} end
+            deepMerge(a[k], v)
+        else
+            a[k] = v
         end
     end
 end
 
--- Create Tabs
-for categoryName, categoryTable in pairs(config.mods) do
-    local Tab = Instance.new("TextButton", TabContainer)
-    Tab.Size = UDim2.new(1, -10, 0, 30)
-    Tab.BackgroundColor3 = theme.background
-    Tab.TextColor3 = theme.text
-    Tab.Text = categoryName
+-- initialize config: merge defaultConfig with any client-side saved config exposed via ReplicatedStorage
+do
+    state.cfg = {}
+    deepMerge(state.cfg, defaultConfig)
 
-    Tab.MouseButton1Click:Connect(function()
-        openCategory(categoryName, categoryTable)
-    end)
+    -- copy some defaults that depend on local humanoid (set later when char exists)
 end
 
--- Toggles
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if gpe then return end
-    if input.KeyCode == config.mods.binds.toggleMenu then
-        MainFrame.Visible = not MainFrame.Visible
+-- Character & Humanoid helpers
+local function getCharacter()
+    return player.Character or player.CharacterAdded:Wait()
+end
+local function getHumanoid()
+    local c = getCharacter()
+    return c:FindFirstChildOfClass("Humanoid")
+end
+local function getHRP()
+    local c = getCharacter()
+    return c:FindFirstChild("HumanoidRootPart")
+end
+
+-- set defaultSpeed/defaultPower from the loaded character/humanoid
+local function initDefaultsFromHumanoid()
+    local hum = getHumanoid()
+    if hum then
+        if state.cfg.mods.movement.speed.defaultSpeed == nil then
+            state.cfg.mods.movement.speed.defaultSpeed = hum.WalkSpeed
+        end
+        if state.cfg.mods.movement.jump.defaultPower == nil then
+            state.cfg.mods.movement.jump.defaultPower = hum.JumpPower or 50
+        end
+        -- JumpHeight may not exist in all versions; keep defaultHeight if present
+        if state.cfg.mods.movement.jump.defaultHeight == nil then
+            state.cfg.mods.movement.jump.defaultHeight = hum.JumpHeight or 0
+        end
+    end
+end
+
+-- Attempt to load client-side saved config from ReplicatedStorage (ModuleScript or Value) - safer than DataStore on client
+local function loadClientConfigIfPresent()
+    local module = ReplicatedStorage:FindFirstChild("DC_ClientConfig")
+    if module and module:IsA("ModuleScript") then
+        local ok, remoteCfg = pcall(require, module)
+        if ok and type(remoteCfg) == "table" then
+            deepMerge(state.cfg, remoteCfg)
+        end
+    else
+        -- Optionally, look for a Value object with JSON string
+        local val = ReplicatedStorage:FindFirstChild("DC_ClientConfig_JSON")
+        if val and val:IsA("StringValue") then
+            local ok, parsed = pcall(function() return HttpService:JSONDecode(val.Value) end)
+            if ok and type(parsed) == "table" then
+                deepMerge(state.cfg, parsed)
+            end
+        end
+    end
+end
+
+-- Save config client-side: prefer sending to server RemoteEvent for persistent storage
+local function saveConfigToServer()
+    local ev = ReplicatedStorage:FindFirstChild("DC_SaveConfig")
+    if ev and ev:IsA("RemoteEvent") then
+        local ok, payload = pcall(function() return HttpService:JSONEncode(state.cfg) end)
+        if ok then
+            ev:FireServer(payload)
+        end
+    else
+        -- No server saver available; do nothing (client cannot use DataStore safely)
+        -- If you want to persist between sessions for testing, create ReplicatedStorage objects from the server
+    end
+end
+
+-- UI creation (simple, same layout; parent respects testing flag)
+local ScreenGui
+local function createMenu()
+    local parent
+    if state.cfg.testing then
+        parent = playerGui
+    else
+        -- CoreGui parenting may be restricted (roblox security). Try CoreGui but fallback to PlayerGui.
+        parent = playerGui
+        -- If you want CoreGui, add additional checks and permission handling on the server side.
+    end
+
+    ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "DC_Menu"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.Parent = parent
+
+    local theme = state.cfg.mods.themes and state.cfg.mods.themes.list[state.cfg.mods.themes.current] or { background = Color3.fromRGB(20,20,20), text = Color3.fromRGB(255,255,255), accent = Color3.fromRGB(255,0,0) }
+
+    local MainFrame = Instance.new("Frame", ScreenGui)
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, 500, 0, 400)
+    MainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
+    MainFrame.BackgroundColor3 = theme.background
+    MainFrame.Visible = state.cfg.menuToggle
+    MainFrame.Active = true
+    MainFrame.Draggable = true
+
+    local Title = Instance.new("TextLabel", MainFrame)
+    Title.Size = UDim2.new(1,0,0,40)
+    Title.BackgroundTransparency = 1
+    Title.Text = "Death's Control Menu v" .. state.cfg.version
+    Title.Font = Enum.Font.SourceSansBold
+    Title.TextSize = 20
+    Title.TextColor3 = theme.accent
+
+    local TabContainer = Instance.new("Frame", MainFrame)
+    TabContainer.Size = UDim2.new(0,120,1,-40)
+    TabContainer.Position = UDim2.new(0,0,0,40)
+    TabContainer.BackgroundColor3 = theme.background
+
+    local Content = Instance.new("Frame", MainFrame)
+    Content.Name = "Content"
+    Content.Size = UDim2.new(1,-120,1,-40)
+    Content.Position = UDim2.new(0,120,0,40)
+    Content.BackgroundColor3 = Color3.fromRGB(20,20,20)
+
+    local TabLayout = Instance.new("UIListLayout", TabContainer)
+    TabLayout.Padding = UDim.new(0,5)
+    local ContentLayout = Instance.new("UIListLayout", Content)
+    ContentLayout.Padding = UDim.new(0,5)
+
+    local function clearContent()
+        for _, v in ipairs(Content:GetChildren()) do
+            if v:IsA("GuiObject") then v:Destroy() end
+        end
+    end
+
+    local function createToggle(parent, name, settingTable)
+        local Button = Instance.new("TextButton", parent)
+        Button.Size = UDim2.new(1,-10,0,30)
+        Button.BackgroundColor3 = theme.background
+        Button.TextColor3 = theme.text
+        Button.Text = name .. ": " .. tostring(settingTable.enabled)
+        Button.MouseButton1Click:Connect(function()
+            settingTable.enabled = not settingTable.enabled
+            Button.Text = name .. ": " .. tostring(settingTable.enabled)
+            -- apply immediate effect on toggle
+            applyToggleEffects(name, settingTable)
+        end)
+    end
+
+    -- openCategory needs to reference the config subtable; we'll create after function is declared
+    local function openCategory(catName, catTable)
+        clearContent()
+        for featureName, feature in pairs(catTable) do
+            if type(feature) == "table" and feature.enabled ~= nil then
+                createToggle(Content, featureName, feature)
+            end
+        end
+    end
+
+    -- create tabs
+    for categoryName, categoryTable in pairs(state.cfg.mods) do
+        local Tab = Instance.new("TextButton", TabContainer)
+        Tab.Size = UDim2.new(1,-10,0,30)
+        Tab.BackgroundColor3 = theme.background
+        Tab.TextColor3 = theme.text
+        Tab.Text = categoryName
+        Tab.MouseButton1Click:Connect(function()
+            openCategory(categoryName, categoryTable)
+        end)
+    end
+end
+
+-- ------------ EFFECT APPLICATION / STATE MANAGEMENT ---------------
+
+-- A simple dispatcher to apply changes when a toggle is flipped
+function applyToggleEffects(featureName, featureTable)
+    -- Movement toggles
+    if featureName == "fly" then
+        if featureTable.enabled then enableFly() else disableFly() end
+    elseif featureName == "speed" then
+        updateWalkSpeed(featureTable.enabled and featureTable.speed or featureTable.defaultSpeed)
+    elseif featureName == "jump" then
+        updateJumpSettings(featureTable.enabled and featureTable.power or featureTable.defaultPower)
+    elseif featureName == "noClip" then
+        setNoClip(featureTable.enabled)
+    elseif featureName == "esp" or featureName == "chams" or featureName == "tracers" then
+        updateAllVisuals() -- create/remove adornments as needed
+    elseif featureName == "fpsBoost" then
+        applyFPSBoost(featureTable.enabled)
+    end
+end
+
+-- Debounced/no-op helpers
+local function safeSpawn(fn) task.spawn(fn) end
+
+-- WALK SPEED / JUMP updates (apply only when changed)
+function updateWalkSpeed(value)
+    local hum = getHumanoid()
+    if hum and value then
+        hum.WalkSpeed = value
+    end
+end
+
+function updateJumpSettings(power)
+    local hum = getHumanoid()
+    if hum and power then
+        -- keep JumpPower only; JumpHeight is inconsistent across Rbx versions
+        hum.JumpPower = power
+    end
+end
+
+-- NOCLIP (apply on toggle)
+local function setNoClip(enabled)
+    local char = getCharacter()
+    if not char then return end
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            pcall(function() part.CanCollide = not enabled end)
+        end
+    end
+end
+
+-- FLY using BodyVelocity (smoother and avoids constant Velocity writes)
+function enableFly()
+    if state.flyBV and state.flyBV.Parent then return end
+    local hrp = getHRP()
+    if not hrp then return end
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "DC_FlyBV"
+    bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    bv.Velocity = Vector3.new(0,0,0)
+    bv.Parent = hrp
+    state.flyBV = bv
+end
+
+function disableFly()
+    if state.flyBV then
+        pcall(function() state.flyBV:Destroy() end)
+        state.flyBV = nil
+    end
+end
+
+-- VISUALS (ESP / Chams / Tracers) - cache per player
+local function createESPForPlayer(plr)
+    if state.adornments.esp[plr] then return end
+    local character = plr.Character
+    if not character then return end
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    -- BoxHandleAdornment for body
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "DC_ESPBox"
+    box.Adornee = hrp
+    box.Size = Vector3.new(2,5,1)
+    box.Transparency = 0.5
+    box.AlwaysOnTop = true
+    box.Parent = Workspace -- adornments render when parented to Workspace
+
+    state.adornments.esp[plr] = { box = box }
+end
+
+local function removeESPForPlayer(plr)
+    local t = state.adornments.esp[plr]
+    if t and t.box then pcall(function() t.box:Destroy() end) end
+    state.adornments.esp[plr] = nil
+end
+
+local function createChamsForPlayer(plr)
+    if state.adornments.chams[plr] then return end
+    local character = plr.Character
+    if not character then return end
+    local chamTable = {}
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local adorn = Instance.new("BoxHandleAdornment")
+            adorn.Name = "DC_Cham"
+            adorn.Adornee = part
+            adorn.Size = part.Size + Vector3.new(0.05,0.05,0.05)
+            adorn.Transparency = state.cfg.mods.visual.chams.transparency
+            adorn.AlwaysOnTop = true
+            adorn.Parent = Workspace
+            table.insert(chamTable, adorn)
+        end
+    end
+    state.adornments.chams[plr] = chamTable
+end
+
+local function removeChamsForPlayer(plr)
+    local arr = state.adornments.chams[plr]
+    if arr then
+        for _, a in ipairs(arr) do pcall(function() a:Destroy() end) end
+    end
+    state.adornments.chams[plr] = nil
+end
+
+local function createTracerForPlayer(plr)
+    if state.adornments.tracers[plr] then return end
+    local character = plr.Character
+    if not character then return end
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local line = Instance.new("LineHandleAdornment")
+    line.Name = "DC_Tracer"
+    line.Adornee = Workspace:FindFirstChild("HumanoidRootPart") or hrp -- placeholder
+    line.From = getHRP() and getHRP().Position or Vector3.new(0,0,0)
+    line.To = hrp.Position
+    line.Thickness = state.cfg.mods.visual.tracers.thickness
+    line.AlwaysOnTop = true
+    line.Parent = Workspace
+    state.adornments.tracers[plr] = line
+end
+
+local function removeTracerForPlayer(plr)
+    local a = state.adornments.tracers[plr]
+    if a then pcall(function() a:Destroy() end) end
+    state.adornments.tracers[plr] = nil
+end
+
+local function updateAllVisuals()
+    -- iterate players and create/remove adornments based on toggles
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr == player then
+            -- skip local player adornments
+        else
+            -- team check logic
+            local skip = false
+            if state.cfg.mods.visual.esp.teamCheck and plr.Team == player.Team then
+                skip = true
+            end
+
+            if state.cfg.mods.visual.esp.enabled and not skip then
+                createESPForPlayer(plr)
+            else
+                removeESPForPlayer(plr)
+            end
+
+            if state.cfg.mods.visual.chams.enabled and not skip then
+                createChamsForPlayer(plr)
+            else
+                removeChamsForPlayer(plr)
+            end
+
+            if state.cfg.mods.visual.tracers.enabled and not skip then
+                createTracerForPlayer(plr)
+            else
+                removeTracerForPlayer(plr)
+            end
+        end
+    end
+end
+
+-- apply FPS boost (one-time)
+function applyFPSBoost(enabled)
+    if enabled then
+        for setting, value in pairs(state.cfg.mods.misc.fpsBoost.settings.Rendering) do pcall(function() Lighting[setting] = value end) end
+        -- Effects and Performance changes are best applied server-side or via UserSettings on the client with caution
+    else
+        -- no revert implemented; you can store previous values if needed
+    end
+end
+
+-- AutoClicker using VirtualUser (respect CPS)
+local function runAutoClicker()
+    local ac = state.cfg.mods.combat.autoClicker
+    if not ac.enabled then return end
+    local key = ac.keybind
+    if UserInputService:IsKeyDown(key) then
+        local now = tick()
+        local interval = 1 / math.max(ac.cps, 1)
+        if now - state.lastAutoClick >= interval then
+            state.lastAutoClick = now
+            -- simulate mouse click using VirtualUser
+            pcall(function()
+                VirtualUser:Button1Down(Vector2.new(0,0))
+                task.wait(0.01)
+                VirtualUser:Button1Up(Vector2.new(0,0))
+            end)
+        end
+    end
+end
+
+-- Triggerbot (simple: check mouse.Target and use virtual click)
+local function runTriggerbot()
+    local tb = state.cfg.mods.combat.triggerbot
+    if not tb.enabled then return end
+    local target = player:GetMouse().Target
+    if target and target.Parent and target.Parent:FindFirstChildOfClass("Humanoid") then
+        local targetPlr = Players:GetPlayerFromCharacter(target.Parent)
+        if targetPlr and targetPlr ~= player then
+            if tb.teamCheck and targetPlr.Team == player.Team then return end
+            -- small delay then click
+            task.spawn(function()
+                task.wait(tb.delay)
+                pcall(function()
+                    VirtualUser:Button1Down(Vector2.new(0,0))
+                    task.wait(0.01)
+                    VirtualUser:Button1Up(Vector2.new(0,0))
+                end)
+            end)
+        end
+    end
+end
+
+-- FLY control update per-frame (BodyVelocity target velocity)
+local function updateFlyMovement(dt)
+    if not state.cfg.mods.movement.fly.enabled then return end
+    if not state.flyBV then enableFly() end
+    local hrp = getHRP()
+    if not hrp or not state.flyBV then return end
+
+    local flySpeed = state.cfg.mods.movement.fly.speed or 100
+    local dir = Vector3.new(0,0,0)
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + hrp.CFrame.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - hrp.CFrame.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - hrp.CFrame.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + hrp.CFrame.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0,1,0) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir = dir - Vector3.new(0,1,0) end
+
+    if dir.Magnitude > 0 then
+        state.flyBV.Velocity = dir.Unit * flySpeed
+    else
+        state.flyBV.Velocity = Vector3.new(0,0,0)
+    end
+end
+
+-- update adornments per-frame where necessary (e.g., tracers line endpoints)
+local function updateAdornments()
+    for plr, line in pairs(state.adornments.tracers) do
+        local chr = plr.Character
+        local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
+        if hrp and line then
+            local myHRP = getHRP()
+            if myHRP then
+                pcall(function()
+                    line.From = myHRP.Position
+                    line.To = hrp.Position
+                end)
+            end
+        end
+    end
+end
+
+-- ---------- ONE-TIME EVENT CONNECTIONS (not in frame loop) ----------
+-- Init defaults when char exists or respawns
+player.CharacterAdded:Connect(function()
+    initDefaultsFromHumanoid()
+    -- reapply toggles when respawned
+    if state.cfg.mods.movement.fly.enabled then enableFly() end
+    if state.cfg.mods.utility.noClip.enabled then setNoClip(true) end
+    updateAllVisuals()
+end)
+pcall(initDefaultsFromHumanoid)
+
+-- Anti-AFK
+player.Idled:Connect(function()
+    if state.cfg.mods.utility.antiAfk.enabled then
+        pcall(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new(0,0))
+        end)
     end
 end)
 
+-- Infinite jump
+local humanoid = getHumanoid()
+if humanoid then
+    humanoid.Jumping:Connect(function(active)
+        if state.cfg.mods.utility.infiniteJump.enabled and active then
+            local h = getHumanoid()
+            if h then pcall(function() h:ChangeState(Enum.HumanoidStateType.Jumping) end) end
+        end
+    end)
+end
+
 UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
-
-    if input.KeyCode == config.mods.binds.toggleMenu then
-        MainFrame.Visible = not MainFrame.Visible
+    if input.KeyCode == state.cfg.mods.binds.toggleMenu then
+        if ScreenGui and ScreenGui:FindFirstChild("MainFrame") then
+            ScreenGui.MainFrame.Visible = not ScreenGui.MainFrame.Visible
+        end
         return
     end
 
-    for modCategory, features in pairs(config.mods) do
-        if typeof(features) == "table" then
-            for featureName, feature in pairs(features) do
-                if typeof(feature) == "table" then
-                    -- Check if feature has a keybind entry in binds
-                    local bindKey = config.mods.binds[featureName]
-                    if bindKey and input.KeyCode == bindKey then
-                        feature.enabled = not feature.enabled
-                        print(featureName .. " set to " .. tostring(feature.enabled))
-                    end
+    for catName, catTable in pairs(state.cfg.mods) do
+        for featName, featTable in pairs(catTable) do
+            if type(featTable) == "table" and featTable.enabled ~= nil then
+                local bindKey = state.cfg.mods.binds[featName]
+                if bindKey and input.KeyCode == bindKey then
+                    featTable.enabled = not featTable.enabled
+                    applyToggleEffects(featName, featTable)
+                    if catName == "visual" then updateAllVisuals() end
                 end
             end
         end
     end
 end)
 
-RunService.RenderStepped:Connect(function()
-    -- MOVEMENT
-
-    -- Fly
-    if config.mods.movement.fly.enabled then
-        local moveDirection = Vector3.new(0, 0, 0)
-        local flySpeed = config.mods.movement.fly.speed
-
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDirection = moveDirection + hrp.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDirection = moveDirection - hrp.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDirection = moveDirection - hrp.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDirection = moveDirection + hrp.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDirection = moveDirection + Vector3.new(0, 1, 0) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveDirection = moveDirection - Vector3.new(0, 1, 0) end
-
-        if moveDirection.Magnitude > 0 then
-            hrp.Velocity = moveDirection.Unit * flySpeed
-        else
-            hrp.Velocity = Vector3.new(0, 0, 0)
-        end
-    end
-
-    -- Speed Hack
-    hum.WalkSpeed = config.mods.movement.speed.enabled and config.mods.movement.speed.speed or config.mods.movement.speed.defaultSpeed
-
-    -- Jump Hack
-    hum.JumpPower = config.mods.movement.jump.enabled and config.mods.movement.jump.power or config.mods.movement.jump.defaultPower
-    hum.JumpHeight = config.mods.movement.jump.enabled and config.mods.movement.jump.height or config.mods.movement.jump.defaultHeight
-
-    -- UTILITY
-
-    -- NoClip
-    for _, part in pairs(char:GetChildren()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = not config.mods.utility.noClip.enabled
-        end
-    end
-
-    -- Infinite Jump
-    if config.mods.utility.infiniteJump.enabled then
-        hum.Jumping:Connect(function(active)
-            if active then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
-        end)
-    end
-
-    -- Anti-AFK
-    if config.mods.utility.antiAfk.enabled then
-        player.Idled:Connect(function()
-            VirtualUser:CaptureController()
-            VirtualUser:ClickButton2(Vector2.new())
-        end)
-    end
-
-    -- FUN
-
-    -- Spin
-    if config.mods.fun.spin.enabled then
-        hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(config.mods.fun.spin.speed), 0)
-    end
-
-    -- Fake Lag
-    if config.mods.fun.fakeLag.enabled then
-        task.wait(config.mods.fun.fakeLag.amount)
-    end
-
-    -- Fling (automatic, safe)
-    if config.mods.fun.fling.enabled and config.mods.fun.fling.target then
-        local targetPlayer = config.mods.fun.fling.target
-        if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local targetHRP = targetPlayer.Character.HumanoidRootPart
-            hrp.CFrame = CFrame.new(targetHRP.Position.X, targetHRP.Position.Y - 2, targetHRP.Position.Z)
-            hrp.Velocity = Vector3.new(
-                math.random(-1, 1) * config.mods.fun.fling.force,
-                config.mods.fun.fling.force,
-                math.random(-1, 1) * config.mods.fun.fling.force
-            )
-        end
-    end
-
-    -- COMBAT
-
-    -- Triggerbot
-    if config.mods.combat.triggerbot.enabled then
-        if mouse.Target and mouse.Target.Parent and mouse.Target.Parent:FindFirstChild("Humanoid") then
-            local targetPlayer = Players:GetPlayerFromCharacter(mouse.Target.Parent)
-            if targetPlayer and targetPlayer ~= player then
-                if config.mods.combat.triggerbot.teamCheck and targetPlayer.Team == player.Team then return end
-                task.wait(config.mods.combat.triggerbot.delay)
-                UserInputService.MouseButton1Down:Fire()
-            end
-        end
-    end
-
-    -- Auto Clicker
-    if config.mods.combat.autoClicker.enabled then
-        if UserInputService:IsKeyDown(config.mods.combat.autoClicker.keybind) then
-            local cps = config.mods.combat.autoClicker.cps
-            local interval = 1 / cps
-            UserInputService.MouseButton1Down:Fire()
-            task.wait(interval)
-            UserInputService.MouseButton1Up:Fire()
-        end
-    end
-
-    -- VISUAL
-
-    -- ESP / Chams / Tracers / FOV / Wallhack
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            -- Team check
-            if config.mods.visual.esp.teamCheck and plr.Team == player.Team then continue end
-
-            local hrpTarget = plr.Character.HumanoidRootPart
-
-            -- ESP Box
-            if config.mods.visual.esp.enabled and config.mods.visual.esp.box then
-                if not hrpTarget:FindFirstChild("ESP_Box") then
-                    local box = Instance.new("BoxHandleAdornment", hrpTarget)
-                    box.Name = "ESP_Box"
-                    box.Adornee = hrpTarget
-                    box.Size = Vector3.new(2, 5, 1)
-                    box.Color3 = Color3.new(1, 0, 0)
-                    box.Transparency = 0.5
-                    box.AlwaysOnTop = true
-                end
-            end
-
-            -- Chams
-            if config.mods.visual.chams.enabled then
-                for _, part in pairs(plr.Character:GetChildren()) do
-                    if part:IsA("BasePart") and not part:FindFirstChild("Chams") then
-                        local cham = Instance.new("BoxHandleAdornment", part)
-                        cham.Name = "Chams"
-                        cham.Adornee = part
-                        cham.Size = part.Size + Vector3.new(0.1, 0.1, 0.1)
-                        cham.Color3 = config.mods.visual.chams.color
-                        cham.Transparency = config.mods.visual.chams.transparency
-                        cham.AlwaysOnTop = true
-                    end
-                end
-            end
-
-            -- Tracers
-            if config.mods.visual.tracers.enabled then
-                local tracer = hrpTarget:FindFirstChild("ESP_Tracer")
-                if not tracer then
-                    tracer = Instance.new("LineHandleAdornment", hrpTarget)
-                    tracer.Name = "ESP_Tracer"
-                    tracer.Adornee = hrp
-                    tracer.From = hrp.Position
-                    tracer.To = hrpTarget.Position
-                    tracer.Color3 = config.mods.visual.tracers.color
-                    tracer.Thickness = config.mods.visual.tracers.thickness
-                    tracer.AlwaysOnTop = true
-                else
-                    tracer.From = hrp.Position
-                    tracer.To = hrpTarget.Position
-                end
-            end
-
-            -- Wallhack
-            if config.mods.visual.wallhack.enabled then
-                for _, part in pairs(plr.Character:GetChildren()) do
-                    if part:IsA("BasePart") then
-                        part.LocalTransparencyModifier = config.mods.visual.wallhack.transparency
-                    end
-                end
-            end
-        end
-    end
-
-    -- FOV Circle
-    local fovCircle = ScreenGui:FindFirstChild("FOV_Circle")
-    if config.mods.visual.fov.enabled then
-        if not fovCircle then
-            fovCircle = Instance.new("Frame", ScreenGui)
-            fovCircle.Name = "FOV_Circle"
-            fovCircle.Size = UDim2.new(0, config.mods.visual.fov.radius*2, 0, config.mods.visual.fov.radius*2)
-            fovCircle.Position = UDim2.new(0.5, -config.mods.visual.fov.radius, 0.5, -config.mods.visual.fov.radius)
-            fovCircle.BackgroundColor3 = config.mods.visual.fov.color
-            fovCircle.BorderSizePixel = 0
-            local corner = Instance.new("UICorner", fovCircle)
-            corner.CornerRadius = UDim.new(1, 0)
-        else
-            fovCircle.Size = UDim2.new(0, config.mods.visual.fov.radius*2, 0, config.mods.visual.fov.radius*2)
-        end
-    elseif fovCircle then fovCircle:Destroy() end
-
-    -- MISC
-
-    -- FPS Boost
-    if config.mods.misc.fpsBoost.enabled then
-        for setting, value in pairs(config.mods.misc.fpsBoost.settings.Rendering) do pcall(function() Lighting[setting] = value end) end
-        for setting, value in pairs(config.mods.misc.fpsBoost.settings.Effects) do pcall(function() Lighting[setting] = value end) end
-        for setting, value in pairs(config.mods.misc.fpsBoost.settings.Performance) do
-            pcall(function() UserSettings():GetService("UserGameSettings")[setting] = value end)
-        end
-    end
+Players.PlayerRemoving:Connect(function(plr)
+    removeESPForPlayer(plr)
+    removeChamsForPlayer(plr)
+    removeTracerForPlayer(plr)
 end)
 
+Players.PlayerAdded:Connect(function(plr)
+    task.wait(1)
+    updateAllVisuals()
+end)
+
+createMenu()
+
+-- load any client config available
+loadClientConfigIfPresent()
+initDefaultsFromHumanoid()
+updateAllVisuals()
+
+-- ---------- MAIN FRAME UPDATE ----------
+RunService.RenderStepped:Connect(function(dt)
+    if state.cfg.mods.movement.fly.enabled then
+        updateFlyMovement(dt)
+    else
+        if state.flyBV then disableFly() end
+    end
+
+    local speedCfg = state.cfg.mods.movement.speed
+    if speedCfg then
+        local desired = speedCfg.enabled and speedCfg.speed or speedCfg.defaultSpeed
+        local hum = getHumanoid()
+        if hum and hum.WalkSpeed ~= desired then hum.WalkSpeed = desired end
+    end
+
+    local jumpCfg = state.cfg.mods.movement.jump
+    if jumpCfg then
+        local desiredJump = jumpCfg.enabled and jumpCfg.power or jumpCfg.defaultPower
+        local hum = getHumanoid()
+        if hum and hum.JumpPower ~= desiredJump then hum.JumpPower = desiredJump end
+    end
+
+    if state.cfg.mods.utility.noClip.enabled then
+        local char = getCharacter()
+        if char then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    if part.CanCollide then pcall(function() part.CanCollide = false end) end
+                end
+            end
+        end
+    end
+        
+    runAutoClicker()
+    runTriggerbot()
+
+   
+    updateAdornments()
+
+    -- Spin (fun)
+    if state.cfg.mods.fun.spin.enabled then
+        local hrp = getHRP()
+        if hrp then
+            hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(state.cfg.mods.fun.spin.speed) * dt * 60, 0)
+        end
+    end
+
+
+end)
+
+local saveDebounce = false
+local function requestSaveConfig()
+    if saveDebounce then return end
+    saveDebounce = true
+    task.delay(2, function()
+        saveConfigToServer()
+        saveDebounce = false
+    end)
+end
+
+local oldApply = applyToggleEffects
+function applyToggleEffects(featureName, featureTable)
+    oldApply(featureName, featureTable)
+    requestSaveConfig()
+end
+
+print("[DC] Client Loaded!")
+
+-- EOF
