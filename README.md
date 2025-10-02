@@ -1,40 +1,79 @@
 # Death-Client - Roblox
-A LocalScript client for Roblox games. All modules run locally and enhance movement, visuals, and utility for the player.  
-**Version:** 1.0.0  
-**Default Theme:** Red / Black    
-### Load Newest Version with this:
+A LocalScript client for Roblox games. All modules run locally and enhance movement, visuals, combat, utility, and fun for the player.  
+**Version:** 1.0.2  
+**Default Theme:** Red / Black  
 
+### Load Newest Version:
 ```
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Death68093/Death-Client---Roblox/refs/heads/main/Newest.lua"))()
 ```
 
+# Features
 
-## Features
+## Movement
+- **Fly** (configurable speed, smooth movement)  
+- **Speed Hack** (toggle walk speed)  
+- **High Jump / Super Jump**  
+- **Infinite Jump**  
+- **NoClip** (walk through walls/objects)  
 
-### Movement
-- Fly (configurable speed, smooth movement)
-- Noclip (walk through walls/objects)
-- High Jump / Super Jump
-- Speed Hack (walkspeed toggle)
-- Infinite Jump
-- Spider / Wall Climb
-- Air Walk (locks to configured height)
+## Combat
+- **Triggerbot** (automatic clicks when aiming at players)  
+- **Auto Clicker** (configurable CPS, optional jitter)  
+- **Silent Aim** (aim without moving camera)  
+- **Aimbot** (configurable FOV, smoothing, team check)  
 
-### Combat / PvP
-- Aimbot (configurable FOV and smoothing)
-- ESP (player boxes, tracers, health bars)
+## Visuals
+- **ESP** (boxes, names, health, distance)  
+- **Chams** (colored character overlays)  
+- **Tracers** (lines to players, configurable)  
+- **FOV Circle** (shows aiming radius)  
+- **Wallhack** (transparency toggle)  
 
-### Utility
-- Teleport GUI (to players)
-- Anti-AFK
-- Fake Player / Invisibility (real player frozen, fake player moves)
-- Tool cloning & activation (fake player can use tools)
-- ProximityPrompt instant activation (press **E** to trigger)
+## Fun
+- **Spin** (rotate character)  
+- **Fling** (push other players with configurable force)  
+- **Fake Lag** (add delay to simulate lag)  
 
-### Visual / Fun
-- Rainbow Trails
-- Camera Zoom Hack
+## Utility
+- **Anti-AFK** (prevents idle kick)  
+- **Teleport GUI** (save/load positions, teleport to targets)  
+- **Rejoin / Server Hop**  
+- **FPS Boost** (adjust graphics/effects for performance)  
 
-### Safety / Stealth
-- GUI toggle & minimization
-- Keybinds reset when GUI closed (default toggle: **Z**)
+## Hubs & Themes
+- **Hub Loader** (load external Lua hubs)  
+- **Themes** (Red, Blue, Green, Light, Dark)  
+
+## Safety / Stealth
+- **GUI toggle & minimization**  
+- **Keybinds reset when GUI closed**  
+
+# Default Keybind Cheat Sheet
+
+| Feature          | Default Keybind |
+|-----------------|----------------|
+| Toggle Menu      | RightControl   |
+| Fly              | F              |
+| Speed Hack       | Z              |
+| Jump / High Jump | X              |
+| NoClip           | V              |
+| Infinite Jump    | H              |
+| Aimbot           | LeftAlt        |
+| Auto Clicker     | LeftControl    |
+| Fling            | T              |
+| Spin             | G              |
+| Rejoin           | R              |
+| Server Hop       | K              |
+| FPS Boost        | P              |
+| Teleport         | Y              |
+| ESP              | U              |
+| Chams            | I              |
+| Save Teleport    | O              |
+| Load Teleport    | L              |
+| Wallhack         | J              |
+| Tracers          | N              |
+| FOV              | M              |
+| Triggerbot       | B              |
+| Silent Aim       | V              |
+| Anti-AFK         | C              |
