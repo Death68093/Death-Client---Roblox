@@ -49,7 +49,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Death68093/Death-Clie
 - **GUI toggle & minimization**  
 - **Keybinds reset when GUI closed**  
 
-# Default Keybind Cheat Sheet
+# Default Keybinds
 
 | Feature          | Default Keybind |
 |-----------------|----------------|
