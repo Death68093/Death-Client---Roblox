@@ -581,239 +581,211 @@ end
 -- ============================
 -- UI: improved look + minimizable
 -- ============================
-local function uiInstance(name,class,parent,props)
+-- REPLACE your existing createMenu() with this function.
+-- It expects uiInstance(name,class,parent,props) and makeRounded(frame,radius) to exist.
+-- If you don't have those helpers, include the tiny versions below (they're safe to add).
+
+-- tiny helpers (add these above the new createMenu() if you don't already have them)
+local function uiInstance(name, class, parent, props)
     local inst = Instance.new(class)
     inst.Name = name
     if parent then inst.Parent = parent end
     if props then for k,v in pairs(props) do pcall(function() inst[k] = v end) end end
     return inst
 end
-
 local function makeRounded(frame, radius)
-    local cr = Instance.new("UICorner", frame)
+    local cr = Instance.new("UICorner")
     cr.CornerRadius = UDim.new(0, radius or 8)
+    cr.Parent = frame
 end
 
+-- new createMenu()
 local function createMenu()
-    if state.gui and state.gui.Parent then state.gui:Destroy() state.gui = nil end
-    local themes = state.cfg.mods.themes
-    local theme = themes.list[themes.current] or themes.list.Red
+    -- destroy existing GUI safely
+    if state.gui and state.gui.Parent then pcall(function() state.gui:Destroy() end) end
 
-    local sg = uiInstance("DC_ScreenGui","ScreenGui", (state.cfg.testing and playerGui) or playerGui, {ResetOnSpawn = false})
+    local themes = state.cfg.mods.themes
+    local theme = themes and themes.list and (themes.list[themes.current] or themes.list.Red) or { background = Color3.fromRGB(30,30,30), text = Color3.fromRGB(255,255,255), accent = Color3.fromRGB(255,0,0) }
+
+    local sg = uiInstance("DC_ScreenGui","ScreenGui",(state.cfg.testing and playerGui) or playerGui,{ResetOnSpawn = false})
     state.gui = sg
 
-    local main = uiInstance("DC_Main","Frame", sg, {Size = UDim2.new(0,520,0,420), Position = UDim2.new(0.5,-260,0.5,-210), BackgroundColor3 = theme.background})
-    makeRounded(main,12)
-    local shadow = uiInstance("UIStroke","UIStroke", main, {ApplyStrokeMode = "Border"}) -- subtle stroke
-    shadow.Color = theme.accent
-    shadow.Transparency = 0.85
+    local main = uiInstance("DC_Main","Frame", sg, {Size = UDim2.new(0,600,0,420), Position = UDim2.new(0.5,-300,0.5,-210), BackgroundColor3 = theme.background, ZIndex = 2})
+    makeRounded(main, 12)
 
-    -- Header
-    local header = uiInstance("Header","Frame", main, {Size = UDim2.new(1,0,0,44), BackgroundTransparency = 1})
-    local title = uiInstance("Title","TextLabel", header, {Size=UDim2.new(0.7,0,1,0), Position=UDim2.new(0,12,0,0), BackgroundTransparency=1, Text = "Death Client • v"..tostring(state.cfg.version), TextColor3=theme.text, Font=Enum.Font.SourceSansBold, TextSize=18})
-    local miniBtn = uiInstance("Minimize","TextButton", header, {Size=UDim2.new(0,36,0,28), Position=UDim2.new(1,-86,0,8), BackgroundColor3 = theme.accent, Text = "—", TextColor3 = theme.background, AutoButtonColor = true})
-    local closeBtn = uiInstance("Close","TextButton", header, {Size=UDim2.new(0,36,0,28), Position=UDim2.new(1,-40,0,8), BackgroundColor3 = Color3.fromRGB(40,40,40), Text = "X", TextColor3 = theme.text, AutoButtonColor = true})
-    makeRounded(miniBtn,6); makeRounded(closeBtn,6)
-    miniBtn.MouseButton1Click:Connect(function()
-        -- animate minimize: collapse content frame
-        local content = main:FindFirstChild("Content")
-        if not content then return end
-        if state.minimized then
-            -- restore
-            state.minimized = false
-            TweenService:Create(main, TweenInfo.new(0.2), {Size = UDim2.new(0,520,0,420)}):Play()
-            content.Visible = true
-        else
-            state.minimized = true
-            content.Visible = false
-            TweenService:Create(main, TweenInfo.new(0.2), {Size = UDim2.new(0,520,0,64)}):Play()
-        end
-    end)
-    closeBtn.MouseButton1Click:Connect(function() main.Visible = false end)
+    -- header row
+    local header = uiInstance("Header","Frame", main, {Size = UDim2.new(1,0,0,48), BackgroundTransparency = 1})
+    local title = uiInstance("Title","TextLabel", header, {Size = UDim2.new(0.7,0,1,0), Position = UDim2.new(0,12,0,0), BackgroundTransparency = 1, Text = "Death Client • v"..tostring(state.cfg.version), TextColor3 = theme.text, Font = Enum.Font.SourceSansBold, TextSize = 18, TextXAlignment = Enum.TextXAlignment.Left})
+    local controlFrame = uiInstance("Controls","Frame", header, {Size = UDim2.new(0.28, -16, 1, 0), Position = UDim2.new(0.72, 8, 0, 0), BackgroundTransparency = 1})
+    local miniBtn = uiInstance("Minimize","TextButton", controlFrame, {Size = UDim2.new(0,36,0,28), Position = UDim2.new(1,-88,0,10), BackgroundColor3 = theme.accent, Text = "—", TextColor3 = theme.background, AutoButtonColor = true})
+    local closeBtn = uiInstance("Close","TextButton", controlFrame, {Size = UDim2.new(0,36,0,28), Position = UDim2.new(1,-44,0,10), BackgroundColor3 = Color3.fromRGB(40,40,40), Text = "X", TextColor3 = theme.text, AutoButtonColor = true})
+    makeRounded(miniBtn, 6); makeRounded(closeBtn, 6)
 
-    -- Left tabs
-    local tabs = uiInstance("Tabs","Frame", main, {Size=UDim2.new(0,140,1,-44), Position=UDim2.new(0,0,0,44), BackgroundTransparency=1})
-    local tabsLayout = uiInstance("Layout","UIListLayout", tabs, {Padding = UDim.new(0,8), SortOrder = Enum.SortOrder.LayoutOrder})
+    -- left tab column
+    local tabCol = uiInstance("TabCol","Frame", main, {Size = UDim2.new(0,160,1,-48), Position = UDim2.new(0,0,0,48), BackgroundTransparency = 1})
+    local tabPadding = Instance.new("UIPadding", tabCol); tabPadding.PaddingLeft = UDim.new(0,10); tabPadding.PaddingTop = UDim.new(0,8)
+    local tabLayout = Instance.new("UIListLayout", tabCol); tabLayout.Padding = UDim.new(0,8); tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-    -- Content area (scrolling)
-    local content = uiInstance("Content","ScrollingFrame", main, {Size=UDim2.new(1,-140,1,-44), Position=UDim2.new(0,140,0,44), BackgroundColor3 = theme.background})
-    content.CanvasSize = UDim2.new(0,0,2,0)
-    content.ScrollBarThickness = 8
-    content.Name = "Content"
+    -- right content (scrolling)
+    local content = uiInstance("Content","ScrollingFrame", main, {Size = UDim2.new(1,-160,1,-48), Position = UDim2.new(0,160,0,48), BackgroundColor3 = theme.background, ScrollBarThickness = 8})
+    makeRounded(content, 8)
+    local contentPadding = Instance.new("UIPadding", content); contentPadding.PaddingLeft = UDim.new(0,12); contentPadding.PaddingRight = UDim.new(0,12); contentPadding.PaddingTop = UDim.new(0,12)
+    local contentLayout = Instance.new("UIListLayout", content); contentLayout.Padding = UDim.new(0,8); contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-    makeRounded(content,8)
+    -- auto update CanvasSize when children change
+    local function updateCanvas()
+        task.spawn(function()
+            local layout = contentLayout
+            local nextY = 0
+            for _,obj in ipairs(content:GetChildren()) do
+                if obj:IsA("GuiObject") and obj ~= contentLayout and obj ~= contentPadding then
+                    nextY = nextY + (obj.AbsoluteSize.Y + contentLayout.Padding.Offset)
+                end
+            end
+            content.CanvasSize = UDim2.new(0,0,0, math.max(nextY + 12, content.AbsoluteSize.Y))
+        end)
+    end
+    content:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateCanvas)
+    content.ChildAdded:Connect(function() updateCanvas() end)
+    content.ChildRemoved:Connect(function() updateCanvas() end)
 
-    -- small helper to create tab buttons
-    local function newTabButton(txt)
-        local btn = uiInstance("Tab_"..txt,"TextButton", tabs, {Size=UDim2.new(1,-18,0,32), BackgroundTransparency = 0.12, Text = txt, TextColor3 = theme.text, Font = Enum.Font.SourceSans, TextSize = 15})
-        makeRounded(btn,6)
+    -- helper to create tab button that uses layout instead of absolute position
+    local function tabButton(name, onClick)
+        local btn = uiInstance("Tab_"..name, "TextButton", tabCol, {Size = UDim2.new(1, -20, 0, 36), BackgroundTransparency = 0.12, Text = name, TextColor3 = theme.text, AutoButtonColor = true, Font = Enum.Font.SourceSans, TextSize = 15})
+        makeRounded(btn, 8)
+        btn.MouseButton1Click:Connect(function()
+            onClick()
+            -- show small pressed animation
+            local ok, t = pcall(function() return TweenService:Create(btn, TweenInfo.new(0.08), {BackgroundTransparency = 0.05}) end)
+            if ok and t then t:Play(); task.delay(0.12, function() pcall(function() TweenService:Create(btn, TweenInfo.new(0.08), {BackgroundTransparency = 0.12}):Play() end) end) end
+        end)
         return btn
     end
 
-    -- helper to clear content
+    -- small control: clear content container
     local function clearContent()
         for _,c in ipairs(content:GetChildren()) do if c:IsA("GuiObject") then c:Destroy() end end
     end
 
-    -- small UI element creators
-    local function addHeaderLine(txt)
-        local h = uiInstance("H","TextLabel", content, {Size=UDim2.new(1, -24, 0, 24), Position=UDim2.new(0,12,0,0), BackgroundTransparency = 1, Text = txt, TextColor3 = theme.accent, Font = Enum.Font.SourceSansBold, TextSize = 16})
-        return h
-    end
-    local function addToggleLine(label, tbl, key, applyFn)
-        local frame = uiInstance("Line","Frame", content, {Size = UDim2.new(1,-24,0,32), BackgroundTransparency = 1})
-        local lbl = uiInstance("L","TextLabel", frame, {Size = UDim2.new(0.7,0,1,0), BackgroundTransparency = 1, Text = label, TextColor3 = theme.text, Font = Enum.Font.SourceSans, TextSize = 14, Position = UDim2.new(0,6,0,0)})
-        local btn = uiInstance("B","TextButton", frame, {Size = UDim2.new(0,86,0,24), Position = UDim2.new(1,-92,0,4), BackgroundColor3 = tbl.enabled and theme.accent or Color3.fromRGB(50,50,50), Text = tostring(tbl.enabled), TextColor3 = tbl.enabled and theme.background or theme.text})
-        makeRounded(btn,6)
-        btn.MouseButton1Click:Connect(function()
-            tbl.enabled = not tbl.enabled
-            btn.BackgroundColor3 = tbl.enabled and theme.accent or Color3.fromRGB(50,50,50)
-            btn.Text = tostring(tbl.enabled)
-            if applyFn then applyFn(tbl) end
-            saveConfigToServer()
-        end)
-        return frame
-    end
-    local function addNumberLine(label, refTable, refKey, onChange)
-        local frame = uiInstance("LineN","Frame", content, {Size = UDim2.new(1,-24,0,30), BackgroundTransparency = 1})
-        local lbl = uiInstance("L","TextLabel", frame, {Size = UDim2.new(0.48,0,1,0), BackgroundTransparency = 1, Text = label, TextColor3 = theme.text, Font = Enum.Font.SourceSans, TextSize = 14, Position = UDim2.new(0,6,0,0)})
-        local box = uiInstance("Box","TextBox", frame, {Size = UDim2.new(0.48,-10,1,0), Position = UDim2.new(0.5,0,0,0), Text = tostring(refTable[refKey] or ""), ClearTextOnFocus = false, TextColor3 = theme.text})
-        box.ForceRefresh = true
-        box.FocusLost:Connect(function(enter)
-            local n = tonumber(box.Text)
-            if n ~= nil then
-                refTable[refKey] = n
-                if onChange then pcall(onChange) end
-                saveConfigToServer()
-            else
-                box.Text = tostring(refTable[refKey])
-            end
-        end)
-        return frame
-    end
-    local function addButton(label, onClick)
-        local btn = uiInstance("Btn","TextButton", content, {Size = UDim2.new(1,-24,0,28), BackgroundColor3 = theme.accent, Text = label, TextColor3 = theme.background})
-        makeRounded(btn,6)
-        btn.MouseButton1Click:Connect(function() pcall(onClick) end)
-        return btn
-    end
-    local function addSmall(label)
-        local lbl = uiInstance("Lbl","TextLabel", content, {Size = UDim2.new(1,-24,0,20), BackgroundTransparency = 1, Text = label, TextColor3 = theme.text, Font = Enum.Font.SourceSans, TextSize = 13})
+    -- small builders that append into content and rely on UIListLayout order
+    local function addHeader(txt)
+        local lbl = uiInstance("Hdr","TextLabel", content, {Size = UDim2.new(1,0,0,28), BackgroundTransparency = 1, Text = txt, TextColor3 = theme.accent, Font = Enum.Font.SourceSansBold, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left})
         return lbl
     end
+    local function addToggle(label, tbl, applyFn)
+        local frame = uiInstance("Line","Frame", content, {Size = UDim2.new(1,0,0,36), BackgroundTransparency = 1})
+        local lbl = uiInstance("Lbl","TextLabel", frame, {Size = UDim2.new(0.68,0,1,0), Position = UDim2.new(0,6,0,0), BackgroundTransparency = 1, Text = label, TextColor3 = theme.text, Font = Enum.Font.SourceSans, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left})
+        local btn = uiInstance("Btn","TextButton", frame, {Size = UDim2.new(0,92,0,28), Position = UDim2.new(1,-100,0,4), BackgroundColor3 = tbl.enabled and theme.accent or Color3.fromRGB(60,60,60), Text = tostring(tbl.enabled), TextColor3 = tbl.enabled and theme.background or theme.text, AutoButtonColor = true})
+        makeRounded(btn, 6)
+        btn.MouseButton1Click:Connect(function()
+            tbl.enabled = not tbl.enabled
+            btn.BackgroundColor3 = tbl.enabled and theme.accent or Color3.fromRGB(60,60,60)
+            btn.Text = tostring(tbl.enabled)
+            if applyFn then pcall(applyFn, tbl) end
+            pcall(saveConfigToServer)
+        end)
+        return frame
+    end
+    local function addNumber(label, tbl, key, onChange)
+        local frame = uiInstance("Num","Frame", content, {Size = UDim2.new(1,0,0,32), BackgroundTransparency = 1})
+        local lbl = uiInstance("Lbl","TextLabel", frame, {Size = UDim2.new(0.5,0,1,0), Position = UDim2.new(0,6,0,0), BackgroundTransparency = 1, Text = label, TextColor3 = theme.text, Font = Enum.Font.SourceSans, TextSize = 14})
+        local box = uiInstance("Box","TextBox", frame, {Size = UDim2.new(0.45, -12, 1, 0), Position = UDim2.new(0.5, 6, 0, 0), Text = tostring(tbl[key] or ""), ClearTextOnFocus = false, TextColor3 = theme.text})
+        box.FocusLost:Connect(function()
+            local n = tonumber(box.Text)
+            if n then tbl[key] = n; if onChange then pcall(onChange) end pcall(saveConfigToServer) else box.Text = tostring(tbl[key]) end
+        end)
+        return frame
+    end
+    local function addButton(label, fn)
+        local b = uiInstance("ActBtn","TextButton", content, {Size = UDim2.new(1,0,0,34), BackgroundColor3 = theme.accent, Text = label, TextColor3 = theme.background, Font = Enum.Font.SourceSans, TextSize = 14})
+        makeRounded(b, 8)
+        b.MouseButton1Click:Connect(function() pcall(fn) end)
+        return b
+    end
 
-    -- build tabs & pages
+    -- PAGE: Movement
     local function pageMovement()
         clearContent()
-        addHeaderLine("Movement")
-        -- toggles
-        addToggleLine("Fly", state.cfg.mods.movement.fly, "enabled", function() if state.cfg.mods.movement.fly.enabled then enableFly() else disableFly() end end)
-        addToggleLine("Speed", state.cfg.mods.movement.speed, "enabled", function() updateWalkSpeed(state.cfg.mods.movement.speed.enabled and state.cfg.mods.movement.speed.speed or state.cfg.mods.movement.speed.defaultSpeed) end)
-        addToggleLine("Jump", state.cfg.mods.movement.jump, "enabled", function() updateJumpPower(state.cfg.mods.movement.jump.enabled and state.cfg.mods.movement.jump.power or state.cfg.mods.movement.jump.defaultPower) end)
-
-        addNumberLine("Fly speed", state.cfg.mods.movement.fly, "speed", function() end)
-        addNumberLine("Walk speed", state.cfg.mods.movement.speed, "speed", function() updateWalkSpeed(state.cfg.mods.movement.speed.speed) end)
-        addNumberLine("Jump power", state.cfg.mods.movement.jump, "power", function() updateJumpPower(state.cfg.mods.movement.jump.power) end)
-        addToggleLine("NoClip (utility)", state.cfg.mods.utility.noClip, "enabled", function() setNoClip(state.cfg.mods.utility.noClip.enabled) end)
-        addToggleLine("Infinite Jump (utility)", state.cfg.mods.utility.infiniteJump, "enabled", function() end)
+        addHeader("Movement")
+        addToggle("Fly", state.cfg.mods.movement.fly, function(tbl) if tbl.enabled then enableFly() else disableFly() end end)
+        addToggle("Speed", state.cfg.mods.movement.speed, function() updateWalkSpeed(state.cfg.mods.movement.speed.enabled and state.cfg.mods.movement.speed.speed or state.cfg.mods.movement.speed.defaultSpeed) end)
+        addToggle("Jump", state.cfg.mods.movement.jump, function() updateJumpPower(state.cfg.mods.movement.jump.enabled and state.cfg.mods.movement.jump.power or state.cfg.mods.movement.jump.defaultPower) end)
+        addNumber("Fly speed", state.cfg.mods.movement.fly, "speed", function() end)
+        addNumber("Walk speed", state.cfg.mods.movement.speed, "speed", function() updateWalkSpeed(state.cfg.mods.movement.speed.speed) end)
+        addNumber("Jump power", state.cfg.mods.movement.jump, "power", function() updateJumpPower(state.cfg.mods.movement.jump.power) end)
     end
 
+    -- PAGE: Visual
     local function pageVisual()
         clearContent()
-        addHeaderLine("Visuals")
-        addToggleLine("ESP", state.cfg.mods.visual.esp, "enabled", function() updateAllVisuals() end)
-        addToggleLine("Chams", state.cfg.mods.visual.chams, "enabled", function() updateAllVisuals() end)
-        addToggleLine("Tracers", state.cfg.mods.visual.tracers, "enabled", function() updateAllVisuals() end)
-        addToggleLine("FOV overlay", state.cfg.mods.visual.fov, "enabled", function() end)
-        addToggleLine("Wallhack (transparency)", state.cfg.mods.visual.wallhack, "enabled", function() applyWallhack(state.cfg.mods.visual.wallhack.enabled) end)
-        -- color editors (simple CSV)
-        addSmall("ESP color (R,G,B):")
-        do
-            local box = uiInstance("ESPColor","TextBox", content, {Size = UDim2.new(1,-24,0,24), Text = tostring(math.floor(state.cfg.mods.visual.chams.color.R*255))..","..tostring(math.floor(state.cfg.mods.visual.chams.color.G*255))..","..tostring(math.floor(state.cfg.mods.visual.chams.color.B*255)), ClearTextOnFocus = false, TextColor3 = theme.text})
-            box.FocusLost:Connect(function()
-                local r,g,b = box.Text:match("^(%d+),%s*(%d+),%s*(%d+)$")
-                if r and g and b then
-                    local c = Color3.fromRGB(tonumber(r), tonumber(g), tonumber(b))
-                    state.cfg.mods.visual.chams.color = c
-                    updateAllVisuals()
-                    saveConfigToServer()
-                else
-                    box.Text = tostring(math.floor(state.cfg.mods.visual.chams.color.R*255))..","..tostring(math.floor(state.cfg.mods.visual.chams.color.G*255))..","..tostring(math.floor(state.cfg.mods.visual.chams.color.B*255))
-                end
-            end)
-        end
+        addHeader("Visuals")
+        addToggle("ESP", state.cfg.mods.visual.esp, function() updateAllVisuals() end)
+        addToggle("Chams", state.cfg.mods.visual.chams, function() updateAllVisuals() end)
+        addToggle("Tracers", state.cfg.mods.visual.tracers, function() updateAllVisuals() end)
+        addToggle("Wallhack", state.cfg.mods.visual.wallhack, function() applyWallhack(state.cfg.mods.visual.wallhack.enabled) end)
+        addNumber("Tracer thickness", state.cfg.mods.visual.tracers, "thickness", function() updateAllVisuals() end)
     end
 
+    -- PAGE: Combat
     local function pageCombat()
         clearContent()
-        addHeaderLine("Combat")
-        addToggleLine("Aimbot", state.cfg.mods.combat.aimbot, "enabled", function() end)
-        addToggleLine("Triggerbot", state.cfg.mods.combat.triggerbot, "enabled", function() end)
-        addToggleLine("AutoClicker", state.cfg.mods.combat.autoClicker, "enabled", function() end)
-        addNumberLine("Aimbot FOV (px)", state.cfg.mods.combat.aimbot, "fov", function() end)
-        addNumberLine("AutoClicker CPS", state.cfg.mods.combat.autoClicker, "cps", function() end)
+        addHeader("Combat")
+        addToggle("Aimbot", state.cfg.mods.combat.aimbot, function() end)
+        addToggle("Triggerbot", state.cfg.mods.combat.triggerbot, function() end)
+        addToggle("AutoClicker", state.cfg.mods.combat.autoClicker, function() end)
+        addNumber("Aimbot FOV", state.cfg.mods.combat.aimbot, "fov", function() end)
+        addNumber("AutoClicker CPS", state.cfg.mods.combat.autoClicker, "cps", function() end)
     end
 
+    -- PAGE: Fun
     local function pageFun()
         clearContent()
-        addHeaderLine("Fun")
-        addToggleLine("Fling", state.cfg.mods.fun.fling, "enabled", function() end)
-        addToggleLine("Spin", state.cfg.mods.fun.spin, "enabled", function() end)
-        addToggleLine("FakeLag", state.cfg.mods.fun.fakeLag, "enabled", function() end)
-        addNumberLine("Fling force", state.cfg.mods.fun.fling, "force", function() end)
-        -- player selector + fling controls
-        addSmall("Fling target:")
-        local dd = uiInstance("FlingTarget","TextBox", content, {Size = UDim2.new(1,-24,0,26), Text = state.cfg.mods.fun.fling.target or "", ClearTextOnFocus = false, TextColor3 = theme.text})
-        local btns = uiInstance("FBtn","Frame", content, {Size = UDim2.new(1,-24,0,30)})
-        local start = uiInstance("Start","TextButton", "Start", btns, {Parent = btns})
-        -- create start/stop buttons in simpler form
-        local startBtn = uiInstance("StartFling","TextButton", btns, {Size = UDim2.new(0.48,0,1,0), Position = UDim2.new(0,0,0,0), Text = "Start Fling", BackgroundColor3 = theme.accent, TextColor3 = theme.background})
-        local stopBtn = uiInstance("StopFling","TextButton", btns, {Size = UDim2.new(0.48,0,1,0), Position = UDim2.new(0.52,0,0,0), Text = "Stop Fling", BackgroundColor3 = Color3.fromRGB(90,90,90), TextColor3 = theme.text})
-        makeRounded(startBtn,6); makeRounded(stopBtn,6)
-        startBtn.MouseButton1Click:Connect(function()
-            state.cfg.mods.fun.fling.target = dd.Text
-            if state.cfg.mods.fun.fling.target and state.cfg.mods.fun.fling.target ~= "" then
-                task.spawn(function() doFlingBurst(state.cfg.mods.fun.fling.target, state.cfg.mods.fun.fling.force or 1000, 2) end)
-            end
-        end)
-        stopBtn.MouseButton1Click:Connect(function() stopFling() end)
+        addHeader("Fun")
+        addToggle("Fling", state.cfg.mods.fun.fling, function() end)
+        addNumber("Fling force", state.cfg.mods.fun.fling, "force", function() end)
+        addToggle("Spin", state.cfg.mods.fun.spin, function() end)
+        addNumber("Spin speed", state.cfg.mods.fun.spin, "speed", function() end)
+        addToggle("FakeLag", state.cfg.mods.fun.fakeLag, function() end)
     end
 
+    -- PAGE: Utility
     local function pageUtility()
         clearContent()
-        addHeaderLine("Utility")
-        addToggleLine("AntiAFK", state.cfg.mods.utility.antiAfk, "enabled", function() end)
-        addToggleLine("Teleport module", state.cfg.mods.utility.teleport, "enabled", function() end)
-        addButton("Save current position as 'slot1'", function() saveTeleport("slot1") end)
-        addButton("Load 'slot1'", function() loadTeleport("slot1") end)
+        addHeader("Utility")
+        addToggle("AntiAFK", state.cfg.mods.utility.antiAfk, function() end)
+        addToggle("NoClip", state.cfg.mods.utility.noClip, function() setNoClip(state.cfg.mods.utility.noClip.enabled) end)
+        addToggle("Infinite Jump", state.cfg.mods.utility.infiniteJump, function() end)
+        addButton("Save Position -> slot1", function() saveTeleport("slot1") end)
+        addButton("Load slot1", function() loadTeleport("slot1") end)
     end
 
+    -- PAGE: Misc
     local function pageMisc()
         clearContent()
-        addHeaderLine("Misc")
-        addToggleLine("FPS Boost", state.cfg.mods.misc.fpsBoost, "enabled", function(tbl) applyFPSBoost(tbl.enabled) end)
-        addToggleLine("Rejoin (toggle)", state.cfg.mods.misc.rejoin, "enabled", function() end)
-        addToggleLine("ServerHop (toggle)", state.cfg.mods.misc.serverHop, "enabled", function() end)
+        addHeader("Misc")
+        addToggle("FPS Boost", state.cfg.mods.misc.fpsBoost, function(tbl) applyFPSBoost(tbl.enabled) end)
+        addToggle("Rejoin (auto)", state.cfg.mods.misc.rejoin, function() end)
+        addToggle("ServerHop (auto)", state.cfg.mods.misc.serverHop, function() end)
         addButton("Rejoin Now", function() doRejoin() end)
-        addButton("ServerHop (attempt)", function() doServerHop() end)
     end
 
+    -- PAGE: Themes
     local function pageThemes()
         clearContent()
-        addHeaderLine("Themes")
+        addHeader("Themes")
         for name,_ in pairs(state.cfg.mods.themes.list) do
-            local b = uiInstance("Theme_"..name,"TextButton", content, {Size = UDim2.new(1,-24,0,32), Text = name, BackgroundTransparency = 0.12, TextColor3 = theme.text})
-            makeRounded(b,6)
+            local b = uiInstance("Theme"..name,"TextButton", content, {Size = UDim2.new(1,0,0,34), Text = name, BackgroundTransparency = 0.12, TextColor3 = theme.text})
+            makeRounded(b,8)
             b.MouseButton1Click:Connect(function()
                 state.cfg.mods.themes.current = name
                 saveConfigToServer()
-                createMenu() -- rebuild UI to apply new theme
+                createMenu() -- rebuild to apply theme
             end)
         end
     end
 
-    -- Add tabs and bind pages
-    local tabsInfo = {
+    -- hook up tab buttons (UIListLayout handles positioning)
+    local tabs = {
         {"Movement", pageMovement},
         {"Visual", pageVisual},
         {"Combat", pageCombat},
@@ -822,21 +794,38 @@ local function createMenu()
         {"Misc", pageMisc},
         {"Themes", pageThemes},
     }
-    for i,t in ipairs(tabsInfo) do
-        local b = newTabButton(t[1])
-        b.LayoutOrder = i
-        b.MouseButton1Click:Connect(function() t[2]() end)
+    for i,t in ipairs(tabs) do
+        local btn = tabButton(t[1], t[2])
+        btn.LayoutOrder = i
     end
 
-    -- open first tab
+    -- header controls: minimize & close
+    miniBtn.MouseButton1Click:Connect(function()
+        local contentFrame = main:FindFirstChild("Content")
+        if not contentFrame then return end
+        if state.minimized then
+            -- restore
+            state.minimized = false
+            main.Size = UDim2.new(0,600,0,420)
+            content.Visible = true
+        else
+            state.minimized = true
+            content.Visible = false
+            main.Size = UDim2.new(0,600,0,64)
+        end
+    end)
+    closeBtn.MouseButton1Click:Connect(function() main.Visible = false end)
+
+    -- initial page
     pageMovement()
 
-    -- store refs
-    sg:SetAttribute("MainRef", main)
+    -- quick canvas update call
+    task.defer(function() content.CanvasSize = UDim2.new(0,0,0, contentLayout.AbsoluteContentSize + 24) end)
 end
 
--- create initial menu
+-- call the new menu creator
 createMenu()
+
 updateAllVisuals()
 
 -- ============================
