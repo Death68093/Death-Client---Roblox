@@ -8,6 +8,11 @@ A LocalScript client for Roblox games. All modules run locally and enhance movem
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Death68093/Death-Client---Roblox/refs/heads/main/Newest.lua"))()
 ```
 
+### Load Current Beta:
+```
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Death68093/Death-Client---Roblox/refs/heads/main/beta.lua"))()
+```
+
 # Features
 
 ## Movement
