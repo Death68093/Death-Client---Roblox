@@ -1,4 +1,4 @@
--- Death Client v1.0.2 (Full feature set + improved UI + minimizable)
+-- Death Client v1.0.2 (Cleaned, layout-fixed, minimizable)
 -- Paste as a single LocalScript under StarterPlayerScripts (or similar).
 -- NOTE: Some features are client-only; server-side persistence requires a RemoteEvent named "DC_SaveConfig" in ReplicatedStorage.
 
@@ -141,7 +141,7 @@ local state = {
     fakeLagTick = 0,
 }
 
--- deep merge
+-- deep merge function
 local function deepMerge(a, b)
     for k,v in pairs(b) do
         if type(v) == "table" then
@@ -155,7 +155,7 @@ end
 
 deepMerge(state.cfg, defaultConfig)
 
--- helpers for character/humanoid
+-- Character helpers
 local function getCharacter() return player.Character or player.CharacterAdded:Wait() end
 local function getHumanoid()
     local c = player.Character
@@ -180,7 +180,7 @@ local function initDefaultsFromHumanoid()
 end
 pcall(initDefaultsFromHumanoid)
 
--- load client config (ModuleScript or StringValue in ReplicatedStorage)
+-- load client config if present
 local function loadClientConfigIfPresent()
     local module = ReplicatedStorage:FindFirstChild("DC_ClientConfig")
     if module and module:IsA("ModuleScript") then
@@ -205,10 +205,8 @@ local function saveConfigToServer()
 end
 
 -- ============================
--- CORE MOD IMPLEMENTATIONS
+-- Core mod implementations
 -- ============================
-
--- WALK SPEED / JUMP updates
 local function updateWalkSpeed(desired)
     local hum = getHumanoid()
     if hum and desired then pcall(function() hum.WalkSpeed = desired end) end
@@ -218,14 +216,12 @@ local function updateJumpPower(desired)
     if hum and desired then pcall(function() hum.JumpPower = desired end) end
 end
 
--- NOCLIP
 local function setNoClip(enabled)
     local char = getCharacter()
     if not char then return end
     for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") then
             pcall(function() part.CanCollide = not enabled end)
-            -- optionally set Transparency for wallhack effect
             if state.cfg.mods.visual.wallhack.enabled then
                 pcall(function() part.Transparency = state.cfg.mods.visual.wallhack.transparency end)
             end
@@ -233,7 +229,6 @@ local function setNoClip(enabled)
     end
 end
 
--- FLY using BodyVelocity
 local function enableFly()
     if state.flyBV and state.flyBV.Parent then return end
     local hrp = getHRP()
@@ -258,7 +253,6 @@ local function updateFlyMovement(dt)
     local hrp = getHRP()
     if not hrp or not state.flyBV then return end
     local dir = Vector3.new(0,0,0)
-    if UserInputService:IsKeyDown(state.cfg.mods.binds.fly or Enum.KeyCode.F) or UserInputService:IsKeyDown(Enum.KeyCode.W) then end
     if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + hrp.CFrame.LookVector end
     if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - hrp.CFrame.LookVector end
     if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - hrp.CFrame.RightVector end
@@ -269,7 +263,6 @@ local function updateFlyMovement(dt)
     if dir.Magnitude > 0 then state.flyBV.Velocity = dir.Unit * sp else state.flyBV.Velocity = Vector3.new(0,0,0) end
 end
 
--- INFINITE JUMP
 local function bindInfiniteJump()
     local hum = getHumanoid()
     if not hum then return end
@@ -282,7 +275,6 @@ local function bindInfiniteJump()
 end
 pcall(bindInfiniteJump)
 
--- FPS BOOST (apply some Lighting settings)
 local function applyFPSBoost(enabled)
     if enabled then
         local s = state.cfg.mods.misc.fpsBoost.settings.Rendering
@@ -297,11 +289,10 @@ local function applyFPSBoost(enabled)
 end
 
 -- ============================
--- VISUALS: ESP / CHAMS / TRACERS / FOV / WALLHACK
+-- Visuals: ESP / Chams / Tracers / Wallhack
 -- ============================
 local function safeAdornParent() return Workspace end
 
--- ESP: simple BoxHandleAdornment on HRP + optional name health
 local function createESPFor(plr)
     if state.adornments.esp[plr] then return end
     if not plr.Character then return end
@@ -322,7 +313,6 @@ local function removeESPFor(plr)
     state.adornments.esp[plr] = nil
 end
 
--- CHAMS: Box adorner for each BasePart (could be heavy)
 local function createChamsFor(plr)
     if state.adornments.chams[plr] then return end
     if not plr.Character then return end
@@ -347,7 +337,6 @@ local function removeChamsFor(plr)
     state.adornments.chams[plr] = nil
 end
 
--- TRACERS (LineHandleAdornment)
 local function createTracerFor(plr)
     if state.adornments.tracers[plr] then return end
     if not plr.Character then return end
@@ -369,7 +358,6 @@ local function removeTracerFor(plr)
     state.adornments.tracers[plr] = nil
 end
 
--- wallhack: set other players parts transparency (client-side only)
 local function applyWallhack(enabled)
     for _,plr in ipairs(Players:GetPlayers()) do
         if plr ~= player and plr.Character then
@@ -382,7 +370,6 @@ local function applyWallhack(enabled)
     end
 end
 
--- update visuals across players
 local function updateAllVisuals()
     for _,plr in ipairs(Players:GetPlayers()) do
         if plr == player then
@@ -395,7 +382,6 @@ local function updateAllVisuals()
             if state.cfg.mods.visual.tracers.enabled and not skip then createTracerFor(plr) else removeTracerFor(plr) end
         end
     end
-    -- wallhack apply
     applyWallhack(state.cfg.mods.visual.wallhack.enabled)
 end
 
@@ -411,7 +397,7 @@ local function updateAdornmentPositions()
 end
 
 -- ============================
--- COMBAT: autoClicker, triggerbot, aimbot (simple)
+-- Combat: autclicker, triggerbot, aimbot
 -- ============================
 local function runAutoClicker()
     local ac = state.cfg.mods.combat.autoClicker
@@ -451,7 +437,6 @@ local function runTriggerbot()
     end
 end
 
--- simple aimbot: lerp camera toward target's targetPart if key held
 local function findAimbotTarget()
     local best, bestDist = nil, math.huge
     local cam = workspace.CurrentCamera
@@ -485,10 +470,9 @@ local function runAimbot(dt)
 end
 
 -- ============================
--- FUN: fling, spin, fakeLag
+-- Fun: fling, spin, fakeLag
 -- ============================
 local function doFlingBurst(targetName, forceAmt, duration)
-    -- client-only: moves YOUR character toward the target repeatedly
     local target = Players:FindFirstChild(targetName)
     if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then return false, "target missing" end
     local myHRP = getHRP()
@@ -537,7 +521,6 @@ local function applyFakeLag(dt)
     state.fakeLagTick = state.fakeLagTick + dt
     if state.fakeLagTick >= (state.cfg.mods.fun.fakeLag.amount or 0.1) then
         state.fakeLagTick = 0
-        -- small local jitter to simulate lag
         local hrp = getHRP()
         if hrp then
             local orig = hrp.CFrame
@@ -547,7 +530,7 @@ local function applyFakeLag(dt)
 end
 
 -- ============================
--- MISC: rejoin, serverHop, teleport saves
+-- Misc: rejoin, serverHop, teleport saves
 -- ============================
 local function doRejoin()
     local ok, err = pcall(function() TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, player) end)
@@ -555,7 +538,6 @@ local function doRejoin()
 end
 
 local function doServerHop()
-    -- Basic attempt to teleport: invites randomness by teleporting to place ID (note: robust server hopping needs APIs)
     local ok, err = pcall(function() TeleportService:Teleport(game.PlaceId) end)
     return ok, err
 end
@@ -579,13 +561,8 @@ local function loadTeleport(name)
 end
 
 -- ============================
--- UI: improved look + minimizable
+-- UI helpers (single definition)
 -- ============================
--- REPLACE your existing createMenu() with this function.
--- It expects uiInstance(name,class,parent,props) and makeRounded(frame,radius) to exist.
--- If you don't have those helpers, include the tiny versions below (they're safe to add).
-
--- tiny helpers (add these above the new createMenu() if you don't already have them)
 local function uiInstance(name, class, parent, props)
     local inst = Instance.new(class)
     inst.Name = name
@@ -599,9 +576,8 @@ local function makeRounded(frame, radius)
     cr.Parent = frame
 end
 
--- new createMenu()
+-- new createMenu() using UIListLayout/UIPadding for proper formatting
 local function createMenu()
-    -- destroy existing GUI safely
     if state.gui and state.gui.Parent then pcall(function() state.gui:Destroy() end) end
 
     local themes = state.cfg.mods.themes
@@ -632,10 +608,8 @@ local function createMenu()
     local contentPadding = Instance.new("UIPadding", content); contentPadding.PaddingLeft = UDim.new(0,12); contentPadding.PaddingRight = UDim.new(0,12); contentPadding.PaddingTop = UDim.new(0,12)
     local contentLayout = Instance.new("UIListLayout", content); contentLayout.Padding = UDim.new(0,8); contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-    -- auto update CanvasSize when children change
     local function updateCanvas()
         task.spawn(function()
-            local layout = contentLayout
             local nextY = 0
             for _,obj in ipairs(content:GetChildren()) do
                 if obj:IsA("GuiObject") and obj ~= contentLayout and obj ~= contentPadding then
@@ -646,28 +620,24 @@ local function createMenu()
         end)
     end
     content:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateCanvas)
-    content.ChildAdded:Connect(function() updateCanvas() end)
-    content.ChildRemoved:Connect(function() updateCanvas() end)
+    content.ChildAdded:Connect(updateCanvas)
+    content.ChildRemoved:Connect(updateCanvas)
 
-    -- helper to create tab button that uses layout instead of absolute position
     local function tabButton(name, onClick)
         local btn = uiInstance("Tab_"..name, "TextButton", tabCol, {Size = UDim2.new(1, -20, 0, 36), BackgroundTransparency = 0.12, Text = name, TextColor3 = theme.text, AutoButtonColor = true, Font = Enum.Font.SourceSans, TextSize = 15})
         makeRounded(btn, 8)
         btn.MouseButton1Click:Connect(function()
             onClick()
-            -- show small pressed animation
             local ok, t = pcall(function() return TweenService:Create(btn, TweenInfo.new(0.08), {BackgroundTransparency = 0.05}) end)
             if ok and t then t:Play(); task.delay(0.12, function() pcall(function() TweenService:Create(btn, TweenInfo.new(0.08), {BackgroundTransparency = 0.12}):Play() end) end) end
         end)
         return btn
     end
 
-    -- small control: clear content container
     local function clearContent()
         for _,c in ipairs(content:GetChildren()) do if c:IsA("GuiObject") then c:Destroy() end end
     end
 
-    -- small builders that append into content and rely on UIListLayout order
     local function addHeader(txt)
         local lbl = uiInstance("Hdr","TextLabel", content, {Size = UDim2.new(1,0,0,28), BackgroundTransparency = 1, Text = txt, TextColor3 = theme.accent, Font = Enum.Font.SourceSansBold, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left})
         return lbl
@@ -703,7 +673,7 @@ local function createMenu()
         return b
     end
 
-    -- PAGE: Movement
+    -- Pages
     local function pageMovement()
         clearContent()
         addHeader("Movement")
@@ -715,7 +685,6 @@ local function createMenu()
         addNumber("Jump power", state.cfg.mods.movement.jump, "power", function() updateJumpPower(state.cfg.mods.movement.jump.power) end)
     end
 
-    -- PAGE: Visual
     local function pageVisual()
         clearContent()
         addHeader("Visuals")
@@ -726,7 +695,6 @@ local function createMenu()
         addNumber("Tracer thickness", state.cfg.mods.visual.tracers, "thickness", function() updateAllVisuals() end)
     end
 
-    -- PAGE: Combat
     local function pageCombat()
         clearContent()
         addHeader("Combat")
@@ -737,7 +705,6 @@ local function createMenu()
         addNumber("AutoClicker CPS", state.cfg.mods.combat.autoClicker, "cps", function() end)
     end
 
-    -- PAGE: Fun
     local function pageFun()
         clearContent()
         addHeader("Fun")
@@ -746,9 +713,15 @@ local function createMenu()
         addToggle("Spin", state.cfg.mods.fun.spin, function() end)
         addNumber("Spin speed", state.cfg.mods.fun.spin, "speed", function() end)
         addToggle("FakeLag", state.cfg.mods.fun.fakeLag, function() end)
+
+        -- fling controls (simple)
+        addButton("Start fling at target name (set using config)", function()
+            local t = state.cfg.mods.fun.fling.target
+            if t and t ~= "" then task.spawn(function() doFlingBurst(t, state.cfg.mods.fun.fling.force, 2) end) end
+        end)
+        addButton("Stop fling", stopFling)
     end
 
-    -- PAGE: Utility
     local function pageUtility()
         clearContent()
         addHeader("Utility")
@@ -759,7 +732,6 @@ local function createMenu()
         addButton("Load slot1", function() loadTeleport("slot1") end)
     end
 
-    -- PAGE: Misc
     local function pageMisc()
         clearContent()
         addHeader("Misc")
@@ -767,9 +739,9 @@ local function createMenu()
         addToggle("Rejoin (auto)", state.cfg.mods.misc.rejoin, function() end)
         addToggle("ServerHop (auto)", state.cfg.mods.misc.serverHop, function() end)
         addButton("Rejoin Now", function() doRejoin() end)
+        addButton("ServerHop (attempt)", function() doServerHop() end)
     end
 
-    -- PAGE: Themes
     local function pageThemes()
         clearContent()
         addHeader("Themes")
@@ -784,7 +756,6 @@ local function createMenu()
         end
     end
 
-    -- hook up tab buttons (UIListLayout handles positioning)
     local tabs = {
         {"Movement", pageMovement},
         {"Visual", pageVisual},
@@ -799,12 +770,8 @@ local function createMenu()
         btn.LayoutOrder = i
     end
 
-    -- header controls: minimize & close
     miniBtn.MouseButton1Click:Connect(function()
-        local contentFrame = main:FindFirstChild("Content")
-        if not contentFrame then return end
         if state.minimized then
-            -- restore
             state.minimized = false
             main.Size = UDim2.new(0,600,0,420)
             content.Visible = true
@@ -816,20 +783,16 @@ local function createMenu()
     end)
     closeBtn.MouseButton1Click:Connect(function() main.Visible = false end)
 
-    -- initial page
     pageMovement()
-
-    -- quick canvas update call
-    task.defer(function() content.CanvasSize = UDim2.new(0,0,0, contentLayout.AbsoluteContentSize + 24) end)
+    task.defer(function() updateCanvas() end)
 end
 
--- call the new menu creator
+-- initial GUI + visuals
 createMenu()
-
 updateAllVisuals()
 
 -- ============================
--- EVENTS + RENDER LOOP
+-- Events + render loop
 -- ============================
 player.CharacterAdded:Connect(function()
     initDefaultsFromHumanoid()
@@ -849,10 +812,8 @@ end)
 Players.PlayerAdded:Connect(function() task.delay(1, updateAllVisuals) end)
 Players.PlayerRemoving:Connect(function(plr) removeESPFor(plr); removeChamsFor(plr); removeTracerFor(plr) end)
 
--- Input: toggles via binds + menu toggle
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
-    -- main menu toggle
     if input.KeyCode == state.cfg.mods.binds.toggleMenu then
         if state.gui and state.gui.Parent then
             local main = state.gui:FindFirstChild("DC_Main")
@@ -861,18 +822,14 @@ UserInputService.InputBegan:Connect(function(input, gp)
         return
     end
 
-    -- map binds to features
     local binds = state.cfg.mods.binds
     local mods = state.cfg.mods
     for k,v in pairs(binds) do
-        -- when a bound key matches a feature name, toggle that feature
         if type(v) == "EnumItem" and input.KeyCode == v then
-            -- search through mods
             for catName,cat in pairs(mods) do
                 for featName,feat in pairs(cat) do
                     if featName == k and type(feat) == "table" and feat.enabled ~= nil then
                         feat.enabled = not feat.enabled
-                        -- apply immediate effects
                         if featName == "fly" then
                             if feat.enabled then enableFly() else disableFly() end
                         elseif featName == "speed" then
@@ -881,8 +838,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
                             updateJumpPower(feat.enabled and feat.power or feat.defaultPower)
                         elseif featName == "noClip" then
                             setNoClip(feat.enabled)
-                        elseif featName == "infiniteJump" then
-                            -- nothing extra required: bound handler will check
                         elseif featName == "fling" then
                             if not feat.enabled then stopFling() end
                         end
@@ -894,36 +849,28 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
--- main render loop
 RunService.RenderStepped:Connect(function(dt)
-    -- movement
     updateFlyMovement(dt)
     updateWalkSpeed(state.cfg.mods.movement.speed.enabled and state.cfg.mods.movement.speed.speed or state.cfg.mods.movement.speed.defaultSpeed)
     updateJumpPower(state.cfg.mods.movement.jump.enabled and state.cfg.mods.movement.jump.power or state.cfg.mods.movement.jump.defaultPower)
     if state.cfg.mods.utility.noClip.enabled then setNoClip(true) end
 
-    -- visuals
     updateAllVisuals()
     updateAdornmentPositions()
 
-    -- combat
     runAutoClicker()
     runTriggerbot()
     runAimbot(dt)
 
-    -- fun
     applySpin(dt)
     applyFakeLag(dt)
 
-    -- fps boost
     if state.cfg.mods.misc.fpsBoost.enabled then applyFPSBoost(true) end
 
-    -- rejoin/serverHop toggles (if enabled auto-run)
     if state.cfg.mods.misc.rejoin.enabled then state.cfg.mods.misc.rejoin.enabled = false; doRejoin() end
     if state.cfg.mods.misc.serverHop.enabled then state.cfg.mods.misc.serverHop.enabled = false; doServerHop() end
 end)
 
--- cleanup helper
 local function cleanup()
     stopFling()
     disableFly()
