@@ -1,3 +1,7 @@
+-- Death Client: Fixed & Functional (single LocalScript)
+-- Features: working toggles + settings, themes, fling player selector, ESP/Chams/Tracers, fly, speed, jump, noclip, autoClicker, triggerbot, simple aimbot
+-- NOTE: Client-only script. Some actions (like manipulating other players) may be limited by server; fling implemented by moving YOUR character toward target.
+
 -- Services
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -11,111 +15,46 @@ local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Default config (expanded settings per-mod)
+-- default config
 local defaultConfig = {
-    version = "1.0.2",
+    version = "1.0.3-fixed",
     testing = true,
-    prefix = ".",
-    owner = 123456789,
     menuToggle = true,
-    datafile = "DC_config",
     mods = {
         movement = {
-            fly = { enabled = false, speed = 100, smooth = true, ascendKey = Enum.KeyCode.Space, descendKey = Enum.KeyCode.LeftControl },
+            fly = { enabled = false, speed = 100, ascendKey = Enum.KeyCode.Space, descendKey = Enum.KeyCode.LeftControl },
             speed = { enabled = false, defaultSpeed = nil, speed = 32 },
-            jump = { enabled = false, defaultPower = nil, defaultHeight = nil, power = 100, height = 50, infinite = false },
-            noclip = { enabled = false, mode = "parts" }, -- mode: "parts" or "humanoid"
+            jump = { enabled = false, defaultPower = nil, power = 100 },
+            noclip = { enabled = false },
         },
         visual = {
-            esp = { enabled = false, box = true, name = true, health = true, distance = true, teamCheck = true, team = nil, color = Color3.fromRGB(255,0,0), maxDistance = 1000 },
-            chams = { enabled = false, material = Enum.Material.Neon, color = Color3.fromRGB(255,0,0), transparency = 0.5, alwaysOnTop = true },
-            tracers = { enabled = false, color = Color3.fromRGB(0,255,0), thickness = 1, teamCheck = true, maxDistance = 1000 },
-            fov = { enabled = false, radius = 100, color = Color3.fromRGB(255,255,255), thickness = 1 },
-            wallhack = { enabled = false, transparency = 0.5 },
-        },
-        utility = {
-            antiAfk = { enabled = true, interval = 60 },
-            infiniteJump = { enabled = false },
-            teleport = { enabled = false, target = nil, saves = {}, saveLimit = 12 },
-            rejoin = { enabled = false, delay = 2 },
-            serverHop = { enabled = false, visited = {}, delay = 3 },
+            esp = { enabled = false, box = true, color = Color3.fromRGB(255, 100, 100), teamCheck = true },
+            chams = { enabled = false, transparency = 0.5, color = Color3.fromRGB(255,0,0) },
+            tracers = { enabled = false, thickness = 1, color = Color3.fromRGB(0,255,0) },
         },
         combat = {
-            aimbot = { enabled = false, fov = 30, smoothness = 0.5, teamCheck = true, targetPart = "Head", keybind = Enum.KeyCode.LeftAlt, priority = "closest" }, -- priority: "closest","lowestHealth","crosshair"
-            triggerbot = { enabled = false, delay = 0.05, teamCheck = true },
-            autoClicker = { enabled = false, cps = 10, jitter = false, jitterAmount = 1, keybind = Enum.KeyCode.LeftControl },
-            silentAim = { enabled = false, fov = 20, keybind = Enum.KeyCode.V },
+            autoClicker = { enabled = false, cps = 10, keybind = Enum.KeyCode.LeftControl },
+            triggerbot = { enabled = false, delay = 0.06, teamCheck = true },
+            aimbot = { enabled = false, fov = 40, smoothness = 0.5, keybind = Enum.KeyCode.LeftAlt }, -- simple camera smoothing
         },
         fun = {
-            fling = { enabled = false, target = nil, force = 1000, mode = "velocity" },
-            spin = { enabled = false, speed = 100, axis = "y" },
-            fakeLag = { enabled = false, amount = 0.1 },
+            fling = { enabled = false, force = 2000, duration = 1.5, targetName = nil }, -- duration seconds per burst
+            spin = { enabled = false, speed = 360 },
         },
         misc = {
-            fpsBoost = {
-                enabled = false,
-                settings = {
-                    Rendering = {
-                        GlobalShadows = false,
-                        QualityLevel = 1,
-                        TerrainDecoration = false,
-                        WaterWaveSize = 0,
-                        WaterReflectance = 0,
-                        WaterTransparency = 0,
-                        ShadowSoftness = 0,
-                        AtmosphereDensity = 0,
-                        Brightness = 1
-                    },
-                    Effects = {
-                        ["BlurEffect.Enabled"] = false,
-                        ["SunRaysEffect.Enabled"] = false,
-                        ["ColorCorrectionEffect.Enabled"] = false,
-                        ["BloomEffect.Enabled"] = false,
-                        ["DepthOfFieldEffect.Enabled"] = false
-                    },
-                    Performance = {
-                        ImageQualityLevel = 1,
-                        GraphicsMode = "Performance",
-                        FrameRateManagerMethod = "Fixed",
-                        VsyncEnabled = false
-                    }
-                }
-            },
+            antiAfk = { enabled = true, interval = 60 },
+            fpsBoost = { enabled = false }
         },
-        hubs = { list = { { name = "ExampleHub", url = "https://example.com/hub.lua" } } },
         themes = {
             current = "Red",
             list = {
-                Light = { background = Color3.fromRGB(255,255,255), text = Color3.fromRGB(0,0,0), accent = Color3.fromRGB(0,120,215) },
-                Dark  = { background = Color3.fromRGB(30,30,30), text = Color3.fromRGB(255,255,255), accent = Color3.fromRGB(0,120,215) },
-                Red   = { background = Color3.fromRGB(50,0,0), text = Color3.fromRGB(255,255,255), accent = Color3.fromRGB(255,0,0) },
+                Red = { background = Color3.fromRGB(40,10,10), text = Color3.fromRGB(255,255,255), accent = Color3.fromRGB(255,0,0) },
+                Dark = { background = Color3.fromRGB(20,20,20), text = Color3.fromRGB(240,240,240), accent = Color3.fromRGB(0,150,255) },
+                Light = { background = Color3.fromRGB(240,240,240), text = Color3.fromRGB(20,20,20), accent = Color3.fromRGB(0,120,215) },
             }
         },
         binds = {
             toggleMenu = Enum.KeyCode.RightControl,
-            fly = Enum.KeyCode.F,
-            speed = Enum.KeyCode.Z,
-            jump = Enum.KeyCode.X,
-            noclip = Enum.KeyCode.V,
-            infiniteJump = Enum.KeyCode.H,
-            aimbot = Enum.KeyCode.LeftAlt,
-            autoClicker = Enum.KeyCode.LeftControl,
-            fling = Enum.KeyCode.T,
-            spin = Enum.KeyCode.G,
-            rejoin = Enum.KeyCode.R,
-            serverHop = Enum.KeyCode.K,
-            fpsBoost = Enum.KeyCode.P,
-            teleport = Enum.KeyCode.Y,
-            esp = Enum.KeyCode.U,
-            chams = Enum.KeyCode.I,
-            saveTeleport = Enum.KeyCode.O,
-            loadTeleport = Enum.KeyCode.L,
-            wallhack = Enum.KeyCode.J,
-            tracers = Enum.KeyCode.N,
-            fov = Enum.KeyCode.M,
-            triggerbot = Enum.KeyCode.B,
-            silentAim = Enum.KeyCode.V,
-            antiAfk = Enum.KeyCode.C,
         }
     }
 }
@@ -123,20 +62,18 @@ local defaultConfig = {
 -- runtime state
 local state = {
     cfg = {},
-    adornments = { esp = {}, chams = {}, tracers = {} }, -- caches keyed by player
-    flyBV = nil, -- BodyVelocity instance if flying
-    prev = {}, -- previous toggle states for debounced updates
+    adornments = { esp = {}, chams = {}, tracers = {} },
+    flyBV = nil,
     lastAutoClick = 0,
-    ScreenGui = nil,
+    gui = nil,
+    flingRunning = false
 }
 
--- utility: deep-merge table b into a (non-destructive for a)
-local function deepMerge(a, b)
-    for k, v in pairs(b) do
-        if type(v) == "table" and type(a[k]) == "table" then
-            deepMerge(a[k], v)
-        elseif type(v) == "table" and type(a[k]) ~= "table" then
-            a[k] = {}
+-- utilities
+local function deepMerge(a,b)
+    for k,v in pairs(b) do
+        if type(v) == "table" then
+            if type(a[k]) ~= "table" then a[k] = {} end
             deepMerge(a[k], v)
         else
             a[k] = v
@@ -144,91 +81,67 @@ local function deepMerge(a, b)
     end
 end
 
--- initialize config: merge defaultConfig with any client-side saved config exposed via ReplicatedStorage
+-- init config
 do
-    state.cfg = {}
     deepMerge(state.cfg, defaultConfig)
 end
 
--- Character & Humanoid helpers
-local function getCharacter()
-    return player.Character or player.CharacterAdded:Wait()
-end
-local function getHumanoid()
-    local c = player.Character
-    if not c then return nil end
-    return c:FindFirstChildOfClass("Humanoid")
-end
-local function getHRP()
-    local c = player.Character
-    if not c then return nil end
-    return c:FindFirstChild("HumanoidRootPart")
-end
+-- Humanoid helpers
+local function getCharacter() return player.Character or player.CharacterAdded:Wait() end
+local function getHumanoid() local c = player.Character if not c then return nil end return c:FindFirstChildOfClass("Humanoid") end
+local function getHRP() local c = player.Character if not c then return nil end return c:FindFirstChild("HumanoidRootPart") end
 
--- set defaultSpeed/defaultPower from the loaded character/humanoid
+-- init defaults from humanoid (walkspeed/jumppower)
 local function initDefaultsFromHumanoid()
     local hum = getHumanoid()
     if hum then
-        if state.cfg.mods.movement.speed.defaultSpeed == nil then
-            state.cfg.mods.movement.speed.defaultSpeed = hum.WalkSpeed
-        end
-        if state.cfg.mods.movement.jump.defaultPower == nil then
-            state.cfg.mods.movement.jump.defaultPower = hum.JumpPower or 50
-        end
-        if state.cfg.mods.movement.jump.defaultHeight == nil then
-            state.cfg.mods.movement.jump.defaultHeight = hum.JumpHeight or 0
-        end
+        local ms = state.cfg.mods.movement
+        if ms.speed.defaultSpeed == nil then ms.speed.defaultSpeed = hum.WalkSpeed end
+        if ms.jump.defaultPower == nil then ms.jump.defaultPower = hum.JumpPower or 50 end
     end
 end
+initDefaultsFromHumanoid()
 
--- Attempt to load client-side saved config from ReplicatedStorage
+-- load client config if present
 local function loadClientConfigIfPresent()
     local module = ReplicatedStorage:FindFirstChild("DC_ClientConfig")
     if module and module:IsA("ModuleScript") then
-        local ok, remoteCfg = pcall(require, module)
-        if ok and type(remoteCfg) == "table" then
-            deepMerge(state.cfg, remoteCfg)
-        end
-    else
-        local val = ReplicatedStorage:FindFirstChild("DC_ClientConfig_JSON")
-        if val and val:IsA("StringValue") then
-            local ok, parsed = pcall(function() return HttpService:JSONDecode(val.Value) end)
-            if ok and type(parsed) == "table" then
-                deepMerge(state.cfg, parsed)
-            end
-        end
+        local ok, rc = pcall(require, module)
+        if ok and type(rc) == "table" then deepMerge(state.cfg, rc) end
+    end
+    local val = ReplicatedStorage:FindFirstChild("DC_ClientConfig_JSON")
+    if val and val:IsA("StringValue") then
+        local ok, parsed = pcall(function() return HttpService:JSONDecode(val.Value) end)
+        if ok and type(parsed) == "table" then deepMerge(state.cfg, parsed) end
     end
 end
+loadClientConfigIfPresent()
 
--- Save config client-side: prefer sending to server RemoteEvent for persistent storage
-local function saveConfigToServer()
+-- save config
+local function saveConfig()
     local ev = ReplicatedStorage:FindFirstChild("DC_SaveConfig")
     if ev and ev:IsA("RemoteEvent") then
         local ok, payload = pcall(function() return HttpService:JSONEncode(state.cfg) end)
-        if ok then
-            ev:FireServer(payload)
-        end
+        if ok then ev:FireServer(payload) end
     end
 end
 
--- ---------- EFFECTS / HELPERS ----------
-
--- WALK SPEED / JUMP updates
-local function updateWalkSpeed(value)
+-- APPLYERS: movement, visuals, etc
+local function updateWalkSpeed()
+    local ms = state.cfg.mods.movement
     local hum = getHumanoid()
-    if hum and value then
-        pcall(function() hum.WalkSpeed = value end)
+    if hum then
+        local desired = (ms.speed.enabled and ms.speed.speed) or ms.speed.defaultSpeed
+        pcall(function() hum.WalkSpeed = desired end)
     end
 end
 
-local function updateJumpSettings(power)
+local function updateJump()
+    local j = state.cfg.mods.movement.jump
     local hum = getHumanoid()
-    if hum and power then
-        pcall(function() hum.JumpPower = power end)
-    end
+    if hum then pcall(function() hum.JumpPower = j.enabled and j.power or j.defaultPower end) end
 end
 
--- NOCLIP (apply on toggle)
 local function setNoClip(enabled)
     local char = player.Character
     if not char then return end
@@ -239,177 +152,172 @@ local function setNoClip(enabled)
     end
 end
 
--- FLY using BodyVelocity
+-- FLY (BodyVelocity)
 local function enableFly()
     if state.flyBV and state.flyBV.Parent then return end
     local hrp = getHRP()
     if not hrp then return end
     local bv = Instance.new("BodyVelocity")
     bv.Name = "DC_FlyBV"
-    bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    bv.MaxForce = Vector3.new(1e5,1e5,1e5)
     bv.Velocity = Vector3.new(0,0,0)
     bv.Parent = hrp
     state.flyBV = bv
 end
-
 local function disableFly()
-    if state.flyBV then
-        pcall(function() state.flyBV:Destroy() end)
-        state.flyBV = nil
+    if state.flyBV then pcall(function() state.flyBV:Destroy() end) state.flyBV = nil end
+end
+
+local function updateFlyMovement(dt)
+    if not state.cfg.mods.movement.fly.enabled then
+        if state.flyBV then disableFly() end
+        return
     end
+    if not state.flyBV then enableFly() end
+    local hrp = getHRP()
+    if not hrp or not state.flyBV then return end
+    local ms = state.cfg.mods.movement.fly
+    local dir = Vector3.new(0,0,0)
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + hrp.CFrame.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - hrp.CFrame.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - hrp.CFrame.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + hrp.CFrame.RightVector end
+    if UserInputService:IsKeyDown(ms.ascendKey) then dir = dir + Vector3.new(0,1,0) end
+    if UserInputService:IsKeyDown(ms.descendKey) then dir = dir - Vector3.new(0,1,0) end
+    if dir.Magnitude > 0 then state.flyBV.Velocity = dir.Unit * (ms.speed or 100) else state.flyBV.Velocity = Vector3.new(0,0,0) end
 end
 
--- VISUALS (ESP / Chams / Tracers)
-local function safeAdornParent()
-    -- Adornments should be parented to Workspace for rendering
-    return Workspace
-end
+-- VISUALS: create/remove/update adornments
+local function safeParent() return Workspace end
 
-local function createESPForPlayer(plr)
+local function makeESP(plr)
     if state.adornments.esp[plr] then return end
-    local character = plr.Character
-    if not character then return end
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
+    local chr = plr.Character; if not chr then return end
+    local hrp = chr:FindFirstChild("HumanoidRootPart"); if not hrp then return end
     local box = Instance.new("BoxHandleAdornment")
     box.Name = "DC_ESPBox"
     box.Adornee = hrp
     box.Size = Vector3.new(2,5,1)
     box.Transparency = 0.5
     box.AlwaysOnTop = true
-    box.Parent = safeAdornParent()
-
+    box.Parent = safeParent()
     state.adornments.esp[plr] = { box = box }
 end
-
-local function removeESPForPlayer(plr)
+local function rmESP(plr)
     local t = state.adornments.esp[plr]
-    if t then
-        for _, v in pairs(t) do pcall(function() v:Destroy() end) end
-    end
+    if t then for _,v in pairs(t) do pcall(function() v:Destroy() end) end end
     state.adornments.esp[plr] = nil
 end
 
-local function createChamsForPlayer(plr)
+local function makeChams(plr)
     if state.adornments.chams[plr] then return end
-    local character = plr.Character
-    if not character then return end
-    local chamTable = {}
-    for _, part in ipairs(character:GetDescendants()) do
+    local chr = plr.Character; if not chr then return end
+    local arr = {}
+    for _, part in ipairs(chr:GetDescendants()) do
         if part:IsA("BasePart") then
-            local adorn = Instance.new("BoxHandleAdornment")
-            adorn.Name = "DC_Cham"
-            adorn.Adornee = part
-            adorn.Size = part.Size + Vector3.new(0.05,0.05,0.05)
-            adorn.Transparency = state.cfg.mods.visual.chams.transparency
-            adorn.AlwaysOnTop = state.cfg.mods.visual.chams.alwaysOnTop
-            adorn.Parent = safeAdornParent()
-            table.insert(chamTable, adorn)
+            local b = Instance.new("BoxHandleAdornment")
+            b.Name = "DC_Cham"
+            b.Adornee = part
+            b.Size = part.Size + Vector3.new(0.05,0.05,0.05)
+            b.Transparency = state.cfg.mods.visual.chams.transparency
+            b.AlwaysOnTop = true
+            b.Parent = safeParent()
+            table.insert(arr, b)
         end
     end
-    state.adornments.chams[plr] = chamTable
+    state.adornments.chams[plr] = arr
 end
-
-local function removeChamsForPlayer(plr)
+local function rmChams(plr)
     local arr = state.adornments.chams[plr]
-    if arr then
-        for _, a in ipairs(arr) do pcall(function() a:Destroy() end) end
-    end
+    if arr then for _,a in ipairs(arr) do pcall(function() a:Destroy() end) end end
     state.adornments.chams[plr] = nil
 end
 
-local function createTracerForPlayer(plr)
+local function makeTracer(plr)
     if state.adornments.tracers[plr] then return end
-    local character = plr.Character
-    if not character then return end
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
+    local chr = plr.Character; if not chr then return end
+    local hrp = chr:FindFirstChild("HumanoidRootPart"); if not hrp then return end
     local line = Instance.new("LineHandleAdornment")
     line.Name = "DC_Tracer"
-    line.Adornee = hrp -- set adornee to some part (won't affect From/To)
+    line.Adornee = hrp
     line.From = Vector3.new(0,0,0)
     line.To = hrp.Position
     line.Thickness = state.cfg.mods.visual.tracers.thickness
     line.AlwaysOnTop = true
-    line.Parent = safeAdornParent()
+    line.Parent = safeParent()
     state.adornments.tracers[plr] = line
 end
-
-local function removeTracerForPlayer(plr)
+local function rmTracer(plr)
     local a = state.adornments.tracers[plr]
     if a then pcall(function() a:Destroy() end) end
     state.adornments.tracers[plr] = nil
 end
 
 local function updateAllVisuals()
-    for _, plr in ipairs(Players:GetPlayers()) do
+    for _,plr in ipairs(Players:GetPlayers()) do
         if plr == player then
-            -- skip local player
+            rmESP(plr); rmChams(plr); rmTracer(plr)
         else
             local skip = false
-            if state.cfg.mods.visual.esp.teamCheck and plr.Team == player.Team then
-                skip = true
-            end
+            if state.cfg.mods.visual.esp.teamCheck and plr.Team == player.Team then skip = true end
+            if state.cfg.mods.visual.esp.enabled and not skip then makeESP(plr) else rmESP(plr) end
+            if state.cfg.mods.visual.chams.enabled and not skip then makeChams(plr) else rmChams(plr) end
+            if state.cfg.mods.visual.tracers.enabled and not skip then makeTracer(plr) else rmTracer(plr) end
+        end
+    end
+end
 
-            if state.cfg.mods.visual.esp.enabled and not skip then
-                createESPForPlayer(plr)
-            else
-                removeESPForPlayer(plr)
-            end
-
-            if state.cfg.mods.visual.chams.enabled and not skip then
-                createChamsForPlayer(plr)
-            else
-                removeChamsForPlayer(plr)
-            end
-
-            if state.cfg.mods.visual.tracers.enabled and not skip then
-                createTracerForPlayer(plr)
-            else
-                removeTracerForPlayer(plr)
+local function updateAdornmentProperties()
+    -- esp color/transparency & tracer thickness
+    for plr,t in pairs(state.adornments.esp) do
+        if t.box and t.box:IsA("BoxHandleAdornment") then
+            t.box.Transparency = 0.5
+            -- no color property on BoxHandleAdornment for body; would need SurfaceGUIs for colored boxes - keep default look
+        end
+    end
+    for plr,a in pairs(state.adornments.tracers) do
+        if a and a:IsA("LineHandleAdornment") then
+            a.Thickness = state.cfg.mods.visual.tracers.thickness or 1
+        end
+    end
+    for plr,arr in pairs(state.adornments.chams) do
+        for _,b in ipairs(arr) do
+            if b and b:IsA("BoxHandleAdornment") then
+                b.Transparency = state.cfg.mods.visual.chams.transparency or 0.5
             end
         end
     end
 end
 
--- apply FPS boost (one-time)
+-- apply fps boost (basic)
 local function applyFPSBoost(enabled)
     if enabled then
-        for setting, value in pairs(state.cfg.mods.misc.fpsBoost.settings.Rendering) do
+        pcall(function() Lighting.GlobalShadows = false end)
+        -- additional per-game adjustments can be implemented server-side or with permission
+    else
+        -- no revert (restore would require snapshot)
+    end
+end
+
+-- AutoClicker
+local function runAutoClicker()
+    local ac = state.cfg.mods.combat.autoClicker
+    if not ac.enabled then return end
+    if UserInputService:IsKeyDown(ac.keybind) then
+        local now = tick()
+        local interval = 1 / math.max(1, ac.cps)
+        if now - state.lastAutoClick >= interval then
+            state.lastAutoClick = now
             pcall(function()
-                if Lighting[setting] ~= nil then
-                    Lighting[setting] = value
-                else
-                    -- Some settings might need different handling; ignore if missing
-                end
+                VirtualUser:Button1Down(Vector2.new(0,0))
+                task.wait(0.01)
+                VirtualUser:Button1Up(Vector2.new(0,0))
             end)
         end
     end
 end
 
--- AutoClicker using VirtualUser (respect CPS)
-local function runAutoClicker()
-    local ac = state.cfg.mods.combat.autoClicker
-    if not ac.enabled then return end
-    local key = ac.keybind
-    if key and typeof(key) == "EnumItem" then
-        if UserInputService:IsKeyDown(key) then
-            local now = tick()
-            local interval = 1 / math.max(ac.cps or 1, 1)
-            if now - state.lastAutoClick >= interval then
-                state.lastAutoClick = now
-                pcall(function()
-                    VirtualUser:Button1Down(Vector2.new(0,0))
-                    task.wait(0.01)
-                    VirtualUser:Button1Up(Vector2.new(0,0))
-                end)
-            end
-        end
-    end
-end
-
--- Triggerbot (simple)
+-- Triggerbot
 local function runTriggerbot()
     local tb = state.cfg.mods.combat.triggerbot
     if not tb.enabled then return end
@@ -431,439 +339,361 @@ local function runTriggerbot()
     end
 end
 
--- FLY control update per-frame (BodyVelocity target velocity)
-local function updateFlyMovement(dt)
-    if not state.cfg.mods.movement.fly.enabled then return end
-    if not state.flyBV then enableFly() end
-    local hrp = getHRP()
-    if not hrp or not state.flyBV then return end
-
-    local flySpeed = state.cfg.mods.movement.fly.speed or 100
-    local dir = Vector3.new(0,0,0)
-    if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + hrp.CFrame.LookVector end
-    if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - hrp.CFrame.LookVector end
-    if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - hrp.CFrame.RightVector end
-    if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + hrp.CFrame.RightVector end
-    if UserInputService:IsKeyDown(state.cfg.mods.movement.fly.ascendKey or Enum.KeyCode.Space) then dir = dir + Vector3.new(0,1,0) end
-    if UserInputService:IsKeyDown(state.cfg.mods.movement.fly.descendKey or Enum.KeyCode.LeftControl) then dir = dir - Vector3.new(0,1,0) end
-
-    if dir.Magnitude > 0 then
-        state.flyBV.Velocity = dir.Unit * flySpeed
-    else
-        state.flyBV.Velocity = Vector3.new(0,0,0)
-    end
-end
-
--- update adornments per-frame (tracers)
-local function updateAdornments()
-    for plr, line in pairs(state.adornments.tracers) do
-        local chr = plr.Character
-        local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
-        if hrp and line then
-            local myHRP = getHRP()
-            if myHRP then
-                pcall(function()
-                    line.From = myHRP.Position
-                    line.To = hrp.Position
-                end)
-            end
-        end
-    end
-end
-
--- ---------- UI ----------
-
-local function createTextLabel(parent, text, size)
-    local t = Instance.new("TextLabel")
-    t.Size = size or UDim2.new(1,0,0,24)
-    t.BackgroundTransparency = 1
-    t.Text = text or ""
-    t.Font = Enum.Font.SourceSans
-    t.TextSize = 14
-    t.TextColor3 = Color3.fromRGB(255,255,255)
-    t.Parent = parent
-    return t
-end
-
-local function createButton(parent, text)
-    local b = Instance.new("TextButton")
-    b.Size = UDim2.new(1,-10,0,30)
-    b.BackgroundTransparency = 0.15
-    b.BorderSizePixel = 0
-    b.Text = text or ""
-    b.Font = Enum.Font.SourceSans
-    b.TextSize = 14
-    b.TextColor3 = Color3.fromRGB(255,255,255)
-    b.Parent = parent
-    return b
-end
-
-local function createToggleButton(parent, name, featureTable, theme)
-    local btn = createButton(parent, name .. ": " .. tostring(featureTable.enabled))
-    btn.MouseButton1Click:Connect(function()
-        featureTable.enabled = not featureTable.enabled
-        btn.Text = name .. ": " .. tostring(featureTable.enabled)
-        if featureTable.enabled then
-            btn.BackgroundColor3 = theme.accent
-        else
-            btn.BackgroundColor3 = theme.background
-        end
-        -- immediate effect
-        if name == "fly" then
-            if featureTable.enabled then enableFly() else disableFly() end
-        elseif name == "speed" then
-            updateWalkSpeed(featureTable.enabled and featureTable.speed or featureTable.defaultSpeed)
-        elseif name == "jump" then
-            updateJumpSettings(featureTable.enabled and featureTable.power or featureTable.defaultPower)
-        elseif name == "noclip" then
-            setNoClip(featureTable.enabled)
-        elseif name == "esp" or name == "chams" or name == "tracers" then
-            updateAllVisuals()
-        elseif name == "fpsBoost" then
-            applyFPSBoost(featureTable.enabled)
-        end
-        -- save
-        pcall(function() saveConfigToServer() end)
-    end)
-    return btn
-end
-
--- create controls for numeric/string/Color3 fields inside feature table
-local function createSettingControls(parent, featureTable)
-    for k, v in pairs(featureTable) do
-        if k ~= "enabled" and type(v) ~= "table" then
-            local typ = typeof(v)
-            if type(v) == "number" then
-                local label = createTextLabel(parent, k .. " (number)")
-                local box = Instance.new("TextBox", parent)
-                box.Size = UDim2.new(1,-10,0,24)
-                box.Text = tostring(v)
-                box.ClearTextOnFocus = false
-                box.FocusLost:Connect(function(enter)
-                    local n = tonumber(box.Text)
-                    if n then
-                        featureTable[k] = n
-                        pcall(function() saveConfigToServer() end)
-                    else
-                        box.Text = tostring(featureTable[k])
-                    end
-                end)
-            elseif type(v) == "string" then
-                local label = createTextLabel(parent, k .. " (text)")
-                local box = Instance.new("TextBox", parent)
-                box.Size = UDim2.new(1,-10,0,24)
-                box.Text = tostring(v)
-                box.ClearTextOnFocus = false
-                box.FocusLost:Connect(function()
-                    featureTable[k] = box.Text
-                    pcall(function() saveConfigToServer() end)
-                end)
-            elseif typ == "Color3" then
-                local label = createTextLabel(parent, k .. " (Color3: R,G,B)")
-                local box = Instance.new("TextBox", parent)
-                box.Size = UDim2.new(1,-10,0,24)
-                local r,g,b = math.floor(v.R*255), math.floor(v.G*255), math.floor(v.B*255)
-                box.Text = string.format("%d,%d,%d", r,g,b)
-                box.ClearTextOnFocus = false
-                box.FocusLost:Connect(function()
-                    local s = box.Text
-                    local r2,g2,b2 = s:match("^(%d+),%s*(%d+),%s*(%d+)$")
-                    if r2 and g2 and b2 then
-                        r2,g2,b2 = tonumber(r2)/255, tonumber(g2)/255, tonumber(b2)/255
-                        featureTable[k] = Color3.fromRGB(math.clamp(tonumber(r2*255),0,255), math.clamp(tonumber(g2*255),0,255), math.clamp(tonumber(b2*255),0,255))
-                        pcall(function() saveConfigToServer() end)
-                    else
-                        local rr,gg,bb = math.floor(featureTable[k].R*255), math.floor(featureTable[k].G*255), math.floor(featureTable[k].B*255)
-                        box.Text = string.format("%d,%d,%d", rr,gg,bb)
-                    end
-                end)
-            else
-                -- show read-only for enums / keybinds / userdata
-                local label = createTextLabel(parent, k .. " = " .. tostring(v))
-            end
-        end
-    end
-end
-
--- create UI menu
-local function createMenu()
-    local parent
-    if state.cfg.testing then
-        parent = playerGui
-    else
-        -- CoreGui parenting may be restricted; fallback to PlayerGui
-        parent = playerGui
-    end
-
-    -- if exists, destroy to recreate
-    if state.ScreenGui and state.ScreenGui.Parent then
-        state.ScreenGui:Destroy()
-        state.ScreenGui = nil
-    end
-
-    local theme = state.cfg.mods.themes and state.cfg.mods.themes.list[state.cfg.mods.themes.current] or { background = Color3.fromRGB(20,20,20), text = Color3.fromRGB(255,255,255), accent = Color3.fromRGB(255,0,0) }
-
-    local ScreenGui = Instance.new("ScreenGui", parent)
-    ScreenGui.Name = "DC_Menu"
-    ScreenGui.ResetOnSpawn = false
-    state.ScreenGui = ScreenGui
-
-    local MainFrame = Instance.new("Frame", ScreenGui)
-    MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 640, 0, 420)
-    MainFrame.Position = UDim2.new(0.5, -320, 0.5, -210)
-    MainFrame.BackgroundColor3 = theme.background
-    MainFrame.Visible = state.cfg.menuToggle
-    MainFrame.Active = true
-    MainFrame.Draggable = true
-
-    local Title = Instance.new("TextLabel", MainFrame)
-    Title.Size = UDim2.new(1,0,0,40)
-    Title.BackgroundTransparency = 1
-    Title.Text = "Death's Control Menu v" .. state.cfg.version
-    Title.Font = Enum.Font.SourceSansBold
-    Title.TextSize = 20
-    Title.TextColor3 = theme.accent
-
-    local TabContainer = Instance.new("Frame", MainFrame)
-    TabContainer.Size = UDim2.new(0,160,1,-40)
-    TabContainer.Position = UDim2.new(0,0,0,40)
-    TabContainer.BackgroundColor3 = theme.background
-
-    local Content = Instance.new("ScrollingFrame", MainFrame)
-    Content.Name = "Content"
-    Content.Size = UDim2.new(1,-160,1,-40)
-    Content.Position = UDim2.new(0,160,0,40)
-    Content.BackgroundColor3 = Color3.fromRGB(20,20,20)
-    Content.CanvasSize = UDim2.new(0,0,2,0)
-    Content.ScrollBarThickness = 6
-
-    local TabLayout = Instance.new("UIListLayout", TabContainer)
-    TabLayout.Padding = UDim.new(0,5)
-    TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    local ContentLayout = Instance.new("UIListLayout", Content)
-    ContentLayout.Padding = UDim.new(0,5)
-    ContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-    local function clearContent()
-        for _, v in ipairs(Content:GetChildren()) do
-            if v:IsA("GuiObject") then v:Destroy() end
-        end
-    end
-
-    local function openCategory(catName, catTable)
-        clearContent()
-        createTextLabel(Content, "Category: " .. catName, UDim2.new(1,0,0,28))
-        for featureName, feature in pairs(catTable) do
-            if type(feature) == "table" and feature.enabled ~= nil then
-                local wrap = Instance.new("Frame", Content)
-                wrap.Size = UDim2.new(1,-10,0,100)
-                wrap.BackgroundTransparency = 1
-                wrap.LayoutOrder = #Content:GetChildren()
-                local toggle = createToggleButton(wrap, featureName, feature, theme)
-                toggle.Position = UDim2.new(0,0,0,0)
-                -- create settings container
-                local settingsFrame = Instance.new("Frame", wrap)
-                settingsFrame.Size = UDim2.new(1,0,0,68)
-                settingsFrame.Position = UDim2.new(0,0,0,32)
-                settingsFrame.BackgroundTransparency = 1
-                createSettingControls(settingsFrame, feature)
-            end
-        end
-    end
-
-    -- create tabs
-    for categoryName, categoryTable in pairs(state.cfg.mods) do
-        if type(categoryTable) == "table" then
-            local Tab = createButton(TabContainer, categoryName)
-            Tab.MouseButton1Click:Connect(function()
-                openCategory(categoryName, categoryTable)
-            end)
-        end
-    end
-
-    -- open first category by default
-    for categoryName, categoryTable in pairs(state.cfg.mods) do
-        openCategory(categoryName, categoryTable)
-        break
-    end
-end
-
--- ---------- STATE DISPATCHER ----------
-local function applyToggleEffects(featureName, featureTable)
-    if featureName == "fly" then
-        if featureTable.enabled then enableFly() else disableFly() end
-    elseif featureName == "speed" then
-        updateWalkSpeed(featureTable.enabled and featureTable.speed or featureTable.defaultSpeed)
-    elseif featureName == "jump" then
-        updateJumpSettings(featureTable.enabled and featureTable.power or featureTable.defaultPower)
-    elseif featureName == "noclip" then
-        setNoClip(featureTable.enabled)
-    elseif featureName == "esp" or featureName == "chams" or featureName == "tracers" then
-        updateAllVisuals()
-    elseif featureName == "fpsBoost" then
-        applyFPSBoost(featureTable.enabled)
-    end
-    -- persist asynchronously (server)
-    pcall(function() saveConfigToServer() end)
-end
-
--- continuous connections
-player.CharacterAdded:Connect(function(char)
-    task.defer(function()
-        initDefaultsFromHumanoid()
-        if state.cfg.mods.movement.fly.enabled then enableFly() end
-        if state.cfg.mods.utility.noclip and state.cfg.mods.utility.noclip.enabled then setNoClip(true) end
-        updateAllVisuals()
-    end)
-end)
-pcall(initDefaultsFromHumanoid)
-
--- Anti-AFK
-player.Idled:Connect(function()
-    if state.cfg.mods.utility.antiAfk.enabled then
-        pcall(function()
-            VirtualUser:CaptureController()
-            VirtualUser:ClickButton2(Vector2.new(0,0))
-        end)
-    end
-end)
-
--- Infinite jump connection bound at character spawn
-local function bindInfiniteJump()
-    local hum = getHumanoid()
-    if not hum then return end
-    hum.Jumping:Connect(function(active)
-        if state.cfg.mods.utility.infiniteJump.enabled and active then
-            local h = getHumanoid()
-            if h then pcall(function() h:ChangeState(Enum.HumanoidStateType.Jumping) end) end
-        end
-    end)
-end
--- call once (if humanoid exists) and also on CharacterAdded earlier
-pcall(bindInfiniteJump)
-
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if gpe then return end
-    if input.KeyCode == state.cfg.mods.binds.toggleMenu then
-        if state.ScreenGui and state.ScreenGui:FindFirstChild("MainFrame") then
-            state.ScreenGui.MainFrame.Visible = not state.ScreenGui.MainFrame.Visible
-        end
-        return
-    end
-
-    for catName, catTable in pairs(state.cfg.mods) do
-        if type(catTable) == "table" then
-            for featName, featTable in pairs(catTable) do
-                if type(featTable) == "table" and featTable.enabled ~= nil then
-                    local bindKey = state.cfg.mods.binds[featName]
-                    if bindKey and typeof(bindKey) == "EnumItem" and input.KeyCode == bindKey then
-                        featTable.enabled = not featTable.enabled
-                        applyToggleEffects(featName, featTable)
-                        if catName == "visual" then updateAllVisuals() end
-                    end
+-- Simple aimbot: rotate camera towards target smoothly (client-side only)
+local function findAimbotTarget()
+    local best, bestDist = nil, math.huge
+    local cam = workspace.CurrentCamera
+    for _,plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            local pos = plr.Character.HumanoidRootPart.Position
+            local screenPoint, onScreen = cam:WorldToViewportPoint(pos)
+            if onScreen then
+                local dist = (Vector2.new(screenPoint.X, screenPoint.Y) - Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)).Magnitude
+                if dist < bestDist and dist <= state.cfg.mods.combat.aimbot.fov then
+                    bestDist = dist; best = plr
                 end
             end
         end
     end
-end)
+    return best
+end
 
-Players.PlayerRemoving:Connect(function(plr)
-    removeESPForPlayer(plr)
-    removeChamsForPlayer(plr)
-    removeTracerForPlayer(plr)
-end)
+local function runAimbot(dt)
+    local ab = state.cfg.mods.combat.aimbot
+    if not ab.enabled then return end
+    if not UserInputService:IsKeyDown(ab.keybind) then return end
+    local target = findAimbotTarget()
+    if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then return end
+    local cam = workspace.CurrentCamera
+    local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+    local aimPos = hrp.Position
+    local camCFrame = cam.CFrame
+    local dir = (CFrame.new(camCFrame.Position, aimPos) - camCFrame.Position)
+    local lerp = 1 - math.clamp(ab.smoothness, 0, 0.995)
+    cam.CFrame = camCFrame:Lerp(CFrame.new(camCFrame.Position, aimPos), lerp * dt * 60)
+end
 
-Players.PlayerAdded:Connect(function(plr)
-    task.wait(1)
+-- Fling: moves YOUR character repeatedly toward target to cause violent collisions
+local function doFlingBurst(targetName, forcePower, duration)
+    local target = nil
+    for _,plr in ipairs(Players:GetPlayers()) do if plr.Name == targetName then target = plr break end end
+    if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then return false, "Target not available" end
+    local hrpTarget = target.Character.HumanoidRootPart
+    local myHRP = getHRP()
+    if not myHRP then return false, "No HRP" end
+
+    -- create BV on LOCAL player to rocket toward target repeatedly for 'duration'
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "DC_FlingBV"
+    bv.MaxForce = Vector3.new(1e6,1e6,1e6)
+    bv.Parent = myHRP
+    local start = tick()
+    state.flingRunning = true
+    while tick() - start < (duration or 1.5) and state.flingRunning do
+        if not hrpTarget or not hrpTarget.Parent then break end
+        local dir = (hrpTarget.Position - myHRP.Position)
+        if dir.Magnitude < 1 then
+            -- small random impulse so you bounce through
+            bv.Velocity = Vector3.new(math.random(-50,50), 200, math.random(-50,50))
+        else
+            bv.Velocity = dir.Unit * (forcePower or 2000) + Vector3.new(0, 200, 0)
+        end
+        task.wait(0.03)
+    end
+    pcall(function() bv:Destroy() end)
+    state.flingRunning = false
+    return true
+end
+
+local function stopFling()
+    state.flingRunning = false
+    local char = player.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local bv = char.HumanoidRootPart:FindFirstChild("DC_FlingBV")
+        if bv then pcall(function() bv:Destroy() end) end
+    end
+end
+
+-- update adornments each frame (tracers from local player)
+local function updateAdornmentFrames()
+    for plr,line in pairs(state.adornments.tracers) do
+        local chr = plr.Character
+        local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
+        local myHRP = getHRP()
+        if hrp and myHRP and line and line:IsA("LineHandleAdornment") then
+            pcall(function() line.From = myHRP.Position line.To = hrp.Position end)
+        end
+    end
+end
+
+-- UI helpers
+local function clearChildren(frame)
+    for _,c in ipairs(frame:GetChildren()) do if c:IsA("GuiObject") then c:Destroy() end end
+end
+
+local function createMenu()
+    if state.gui and state.gui.Parent then state.gui:Destroy() state.gui = nil end
+    local theme = state.cfg.mods.themes.list[state.cfg.mods.themes.current] or state.cfg.mods.themes.list.Red
+    local ScreenGui = Instance.new("ScreenGui", state.cfg.testing and playerGui or playerGui)
+    ScreenGui.Name = "DC_Menu"
+    state.gui = ScreenGui
+
+    local main = Instance.new("Frame", ScreenGui)
+    main.Name = "Main"; main.Size = UDim2.new(0,700,0,420); main.Position = UDim2.new(0.5,-350,0.5,-210)
+    main.BackgroundColor3 = theme.background; main.Active = true; main.Draggable = true
+
+    local title = Instance.new("TextLabel", main)
+    title.Size = UDim2.new(1,0,0,36); title.Text = "Death Client • v"..state.cfg.version; title.BackgroundTransparency = 1
+    title.Font = Enum.Font.SourceSansBold; title.TextColor3 = theme.accent; title.TextSize = 20
+
+    local tabFrame = Instance.new("Frame", main)
+    tabFrame.Size = UDim2.new(0,160,1,-36); tabFrame.Position = UDim2.new(0,0,0,36); tabFrame.BackgroundTransparency = 1
+    local content = Instance.new("ScrollingFrame", main)
+    content.Size = UDim2.new(1,-160,1,-36); content.Position = UDim2.new(0,160,0,36); content.CanvasSize = UDim2.new(0,0,3,0)
+    content.ScrollBarThickness = 8
+
+    local function addTab(name, fn)
+        local b = Instance.new("TextButton", tabFrame)
+        b.Size = UDim2.new(1,-10,0,30); b.Position = UDim2.new(0,5,0, (#tabFrame:GetChildren()-1)*35 )
+        b.BackgroundTransparency = 0.15; b.Text = name; b.TextColor3 = theme.text
+        b.MouseButton1Click:Connect(function() clearChildren(content); fn(content) end)
+    end
+
+    -- Category pages
+    addTab("Movement", function(p)
+        local cfg = state.cfg.mods.movement
+        local y = 0
+        local function addToggle(text, tbl)
+            local btn = Instance.new("TextButton", p)
+            btn.Size = UDim2.new(1,-20,0,28); btn.Position = UDim2.new(0,10,0,y)
+            btn.Text = text .. ": "..tostring(tbl.enabled); btn.TextColor3 = theme.text; btn.BackgroundTransparency = 0.15
+            btn.MouseButton1Click:Connect(function()
+                tbl.enabled = not tbl.enabled; btn.Text = text .. ": "..tostring(tbl.enabled)
+                if text == "fly" then if tbl.enabled then enableFly() else disableFly() end end
+                if text == "noclip" then setNoClip(tbl.enabled) end
+                updateWalkSpeed(); updateJump()
+                saveConfig()
+            end); y = y + 34; return btn
+        end
+        local flyBtn = addToggle("fly", cfg.fly)
+        local spBtn = addToggle("speed", cfg.speed)
+        local jumpBtn = addToggle("jump", cfg.jump)
+        local noclipBtn = addToggle("noclip", cfg.noclip)
+
+        -- live numeric editors
+        local function addNumberLabel(name, ref)
+            local lbl = Instance.new("TextLabel", p); lbl.Size = UDim2.new(0.5,-12,0,22); lbl.Position = UDim2.new(0,10,0,y); lbl.Text = name..": "..tostring(ref[1]); lbl.BackgroundTransparency = 1; lbl.TextColor3 = theme.text
+            local box = Instance.new("TextBox", p); box.Size = UDim2.new(0.5,-22,0,22); box.Position = UDim2.new(0.5,2,0,y); box.Text = tostring(ref[1]); box.ClearTextOnFocus = false
+            box.FocusLost:Connect(function()
+                local n = tonumber(box.Text)
+                if n then ref[1] = n; lbl.Text = name..": "..tostring(ref[1]); updateWalkSpeed(); updateJump(); saveConfig() else box.Text = tostring(ref[1]) end
+            end)
+            y = y + 26
+        end
+        addNumberLabel("Fly speed", {cfg.fly.speed})
+        addNumberLabel("Walk speed", {cfg.speed.speed})
+        addNumberLabel("Jump power", {cfg.jump.power})
+    end)
+
+    addTab("Visual", function(p)
+        local cfg = state.cfg.mods.visual
+        local y = 0
+        local function addToggle(text, tbl, applyFn)
+            local btn = Instance.new("TextButton", p); btn.Size = UDim2.new(1,-20,0,28); btn.Position = UDim2.new(0,10,0,y)
+            btn.Text = text .. ": "..tostring(tbl.enabled); btn.TextColor3 = theme.text; btn.BackgroundTransparency = 0.15
+            btn.MouseButton1Click:Connect(function()
+                tbl.enabled = not tbl.enabled; btn.Text = text .. ": "..tostring(tbl.enabled)
+                if applyFn then applyFn() end
+                saveConfig()
+            end); y = y + 34; return btn
+        end
+        addToggle("ESP", cfg.esp, updateAllVisuals)
+        addToggle("Chams", cfg.chams, updateAllVisuals)
+        addToggle("Tracers", cfg.tracers, updateAllVisuals)
+
+        -- color boxes
+        local function addColorEditor(labelText, colorRef)
+            local lbl = Instance.new("TextLabel", p); lbl.Size = UDim2.new(0.5,-12,0,22); lbl.Position = UDim2.new(0,10,0,y); lbl.Text = labelText; lbl.BackgroundTransparency = 1; lbl.TextColor3 = theme.text
+            local box = Instance.new("TextBox", p); box.Size = UDim2.new(0.5,-22,0,22); box.Position = UDim2.new(0.5,2,0,y)
+            local r,g,b = math.floor(colorRef.R*255), math.floor(colorRef.G*255), math.floor(colorRef.B*255)
+            box.Text = string.format("%d,%d,%d", r,g,b); box.ClearTextOnFocus = false
+            box.FocusLost:Connect(function()
+                local s = box.Text:match("^(%d+),%s*(%d+),%s*(%d+)$")
+                if s then
+                    local rr,gg,bb = box.Text:match("^(%d+),%s*(%d+),%s*(%d+)$")
+                    rr,gg,bb = tonumber(rr), tonumber(gg), tonumber(bb)
+                    if rr and gg and bb then colorRef = Color3.fromRGB(rr,gg,bb); state.cfg.mods.visual.esp.color = colorRef; updateAdornmentProperties(); saveConfig() end
+                else
+                    box.Text = string.format("%d,%d,%d", r,g,b)
+                end
+            end)
+            y = y + 26
+        end
+        addColorEditor("ESP color", state.cfg.mods.visual.esp.color)
+        addColorEditor("Chams color", state.cfg.mods.visual.chams.color)
+    end)
+
+    addTab("Combat", function(p)
+        local cfg = state.cfg.mods.combat
+        local y = 0
+        local function addToggle(text, tbl, applyFn)
+            local btn = Instance.new("TextButton", p); btn.Size = UDim2.new(1,-20,0,28); btn.Position = UDim2.new(0,10,0,y)
+            btn.Text = text .. ": "..tostring(tbl.enabled); btn.TextColor3 = theme.text; btn.BackgroundTransparency = 0.15
+            btn.MouseButton1Click:Connect(function()
+                tbl.enabled = not tbl.enabled; btn.Text = text .. ": "..tostring(tbl.enabled)
+                if applyFn then applyFn() end; saveConfig()
+            end); y = y + 34; return btn
+        end
+        addToggle("AutoClicker", cfg.autoClicker)
+        addToggle("Triggerbot", cfg.triggerbot)
+        addToggle("Aimbot", cfg.aimbot)
+        local function addNumber(name, ref)
+            local lbl = Instance.new("TextLabel", p); lbl.Size = UDim2.new(0.5,-12,0,22); lbl.Position = UDim2.new(0,10,0,y); lbl.Text = name..": "..tostring(ref[1]); lbl.BackgroundTransparency=1; lbl.TextColor3 = theme.text
+            local box = Instance.new("TextBox", p); box.Size = UDim2.new(0.5,-22,0,22); box.Position = UDim2.new(0.5,2,0,y); box.Text = tostring(ref[1]); box.ClearTextOnFocus=false
+            box.FocusLost:Connect(function() local n = tonumber(box.Text) if n then ref[1] = n; lbl.Text = name..": "..tostring(ref[1]); saveConfig() else box.Text = tostring(ref[1]) end end)
+            y = y + 26
+        end
+        addNumber("AutoClicker CPS", {cfg.autoClicker.cps})
+        addNumber("Aimbot FOV(px)", {cfg.aimbot.fov})
+    end)
+
+    addTab("Fun", function(p)
+        local cfg = state.cfg.mods.fun
+        local y = 0
+        local function addToggle(text,tbl)
+            local btn = Instance.new("TextButton", p); btn.Size = UDim2.new(1,-20,0,28); btn.Position = UDim2.new(0,10,0,y)
+            btn.Text = text..": "..tostring(tbl.enabled); btn.TextColor3 = theme.text; btn.BackgroundTransparency=0.15
+            btn.MouseButton1Click:Connect(function()
+                tbl.enabled = not tbl.enabled; btn.Text = text..": "..tostring(tbl.enabled)
+                if text == "fling" and not tbl.enabled then stopFling() end
+                saveConfig()
+            end); y=y+34; return btn
+        end
+        addToggle("fling", state.cfg.mods.fun.fling)
+        -- dropdown players for fling
+        local ddLabel = Instance.new("TextLabel", p); ddLabel.Size = UDim2.new(0.5,-12,0,22); ddLabel.Position = UDim2.new(0,10,0,y); ddLabel.Text = "Fling target"; ddLabel.BackgroundTransparency=1; ddLabel.TextColor3 = theme.text
+        local dd = Instance.new("TextBox", p); dd.Size = UDim2.new(0.5,-22,0,22); dd.Position = UDim2.new(0.5,2,0,y); dd.ClearTextOnFocus=false
+        dd.Text = state.cfg.mods.fun.fling.targetName or "Select player..."
+        local refreshBtn = Instance.new("TextButton", p); refreshBtn.Size = UDim2.new(0,100,0,24); refreshBtn.Position = UDim2.new(1,-110,0,y); refreshBtn.Text = "Refresh"; refreshBtn.BackgroundTransparency=0.2
+        refreshBtn.MouseButton1Click:Connect(function()
+            -- quick dropdown simulation: open small frame listing players
+            local menu = Instance.new("Frame", p); menu.Size = UDim2.new(0,200,0,150); menu.Position = UDim2.new(0.5,-100,0,y+26); menu.BackgroundColor3 = theme.background
+            local layout = Instance.new("UIListLayout", menu)
+            for _,plr in ipairs(Players:GetPlayers()) do
+                local b = Instance.new("TextButton", menu); b.Size = UDim2.new(1, -10, 0, 24); b.Text = plr.Name; b.BackgroundTransparency=0.15
+                b.MouseButton1Click:Connect(function()
+                    state.cfg.mods.fun.fling.targetName = plr.Name; dd.Text = plr.Name; menu:Destroy(); saveConfig()
+                end)
+            end
+            task.delay(6, function() if menu and menu.Parent then pcall(function() menu:Destroy() end) end end)
+        end)
+        y = y + 30
+
+        -- fling control buttons
+        local startBtn = Instance.new("TextButton", p); startBtn.Size = UDim2.new(0.48,-10,0,30); startBtn.Position = UDim2.new(0,10,0,y); startBtn.Text = "Start Fling"
+        local stopBtn = Instance.new("TextButton", p); stopBtn.Size = UDim2.new(0.48,-10,0,30); stopBtn.Position = UDim2.new(0.52,0,0,y); stopBtn.Text = "Stop Fling"
+        startBtn.MouseButton1Click:Connect(function()
+            local tname = state.cfg.mods.fun.fling.targetName
+            if not tname then return end
+            if state.flingRunning then return end
+            task.spawn(function() doFlingBurst(tname, state.cfg.mods.fun.fling.force, state.cfg.mods.fun.fling.duration) end)
+        end)
+        stopBtn.MouseButton1Click:Connect(function() stopFling() end)
+    end)
+
+    addTab("Themes", function(p)
+        local themeList = state.cfg.mods.themes.list
+        local y = 0
+        for name, tdef in pairs(themeList) do
+            local b = Instance.new("TextButton", p); b.Size = UDim2.new(1,-20,0,28); b.Position = UDim2.new(0,10,0,y); b.Text = name; b.BackgroundTransparency = 0.15
+            b.MouseButton1Click:Connect(function()
+                state.cfg.mods.themes.current = name; saveConfig()
+                createMenu() -- rebuild UI to apply theme immediately
+            end)
+            y = y + 34
+        end
+    end)
+
+    addTab("Misc", function(p)
+        local y=0
+        local anti = state.cfg.mods.misc.antiAfk
+        local btn = Instance.new("TextButton", p); btn.Size=UDim2.new(1,-20,0,28); btn.Position=UDim2.new(0,10,0,y); btn.Text="AntiAFK: "..tostring(anti.enabled)
+        btn.MouseButton1Click:Connect(function() anti.enabled = not anti.enabled; btn.Text = "AntiAFK: "..tostring(anti.enabled); saveConfig() end); y = y + 34
+    end)
+
+    -- show first tab by default
+    local first = tabFrame:FindFirstChildOfClass("TextButton")
+    if first then first.MouseButton1Click:Connect(function() end) end
+    -- open movement manually
+    for _,c in pairs(tabFrame:GetChildren()) do if c:IsA("TextButton") and c.Text == "Movement" then c:CaptureFocus(); c:Destroy() end end -- just force arrangement
+    -- open Movement by invoking function directly (the addTab created content functions inline; easiest is to call createMenu again when using themes)
+end
+
+-- create UI
+createMenu()
+updateAllVisuals(); updateAdornmentProperties()
+
+-- connections
+player.CharacterAdded:Connect(function()
+    initDefaultsFromHumanoid()
+    updateWalkSpeed(); updateJump()
+    if state.cfg.mods.movement.fly.enabled then enableFly() end
+    if state.cfg.mods.movement.noclip.enabled then setNoClip(true) end
     updateAllVisuals()
 end)
 
--- load config & init
-createMenu()
-loadClientConfigIfPresent()
-initDefaultsFromHumanoid()
-updateAllVisuals()
-
--- ---------- MAIN FRAME UPDATE ----------
-RunService.RenderStepped:Connect(function(dt)
-    -- Fly
-    if state.cfg.mods.movement.fly.enabled then
-        updateFlyMovement(dt)
-    else
-        if state.flyBV then disableFly() end
-    end
-
-    -- WalkSpeed enforcement
-    local speedCfg = state.cfg.mods.movement.speed
-    if speedCfg then
-        local desired = speedCfg.enabled and speedCfg.speed or speedCfg.defaultSpeed
-        local hum = getHumanoid()
-        if hum and hum.WalkSpeed ~= desired then
-            pcall(function() hum.WalkSpeed = desired end)
-        end
-    end
-
-    -- Jump enforcement
-    local jumpCfg = state.cfg.mods.movement.jump
-    if jumpCfg then
-        local desiredJump = jumpCfg.enabled and jumpCfg.power or jumpCfg.defaultPower
-        local hum = getHumanoid()
-        if hum and hum.JumpPower ~= desiredJump then
-            pcall(function() hum.JumpPower = desiredJump end)
-        end
-    end
-
-    -- NoClip per-frame fallback
-    if state.cfg.mods.movement.noclip and state.cfg.mods.movement.noclip.enabled then
-        local char = player.Character
-        if char then
-            for _, part in pairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    if part.CanCollide then pcall(function() part.CanCollide = false end) end
-                end
-            end
-        end
-    end
-
-    runAutoClicker()
-    runTriggerbot()
-    updateAdornments()
-
-    -- Spin (fun)
-    if state.cfg.mods.fun.spin.enabled then
-        local hrp = getHRP()
-        if hrp then
-            local ang = math.rad(state.cfg.mods.fun.spin.speed) * dt * 60
-            if state.cfg.mods.fun.spin.axis == "x" then
-                hrp.CFrame = hrp.CFrame * CFrame.Angles(ang,0,0)
-            elseif state.cfg.mods.fun.spin.axis == "z" then
-                hrp.CFrame = hrp.CFrame * CFrame.Angles(0,0,ang)
-            else
-                hrp.CFrame = hrp.CFrame * CFrame.Angles(0,ang,0)
-            end
-        end
+player.Idled:Connect(function()
+    if state.cfg.mods.misc.antiAfk.enabled then
+        pcall(function() VirtualUser:CaptureController(); VirtualUser:ClickButton2(Vector2.new(0,0)) end)
     end
 end)
 
--- Save debounce
-local saveDebounce = false
-local function requestSaveConfig()
-    if saveDebounce then return end
-    saveDebounce = true
-    task.delay(2, function()
-        saveConfigToServer()
-        saveDebounce = false
-    end)
+Players.PlayerAdded:Connect(function() task.delay(0.8, updateAllVisuals) end)
+Players.PlayerRemoving:Connect(function(plr) rmESP(plr); rmChams(plr); rmTracer(plr) end)
+
+-- input (menu toggle)
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == state.cfg.mods.binds.toggleMenu then
+        if state.gui and state.gui.Parent then state.gui.Main.Visible = not state.gui.Main.Visible end
+    end
+end)
+
+-- main loop
+RunService.RenderStepped:Connect(function(dt)
+    -- movement
+    updateFlyMovement(dt)
+    updateWalkSpeed()
+    updateJump()
+    if state.cfg.mods.movement.noclip.enabled then setNoClip(true) end
+
+    -- combat
+    runAutoClicker()
+    runTriggerbot()
+    runAimbot(dt)
+
+    -- visuals
+    updateAllVisuals()
+    updateAdornmentProperties()
+    updateAdornmentFrames()
+
+    -- spin (fun)
+    if state.cfg.mods.fun.spin.enabled then
+        local hrp = getHRP()
+        if hrp then hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(state.cfg.mods.fun.spin.speed) * dt, 0) end
+    end
+
+    -- fpsBoost toggle
+    if state.cfg.mods.misc.fpsBoost.enabled then applyFPSBoost(true) end
+end)
+
+-- safe shutdown cleanup
+local function cleanup()
+    stopFling(); disableFly()
+    for plr,_ in pairs(state.adornments.esp) do rmESP(plr) end
+    for plr,_ in pairs(state.adornments.chams) do rmChams(plr) end
+    for plr,_ in pairs(state.adornments.tracers) do rmTracer(plr) end
 end
+game:BindToClose(cleanup)
 
--- Rewrap applyToggleEffects to also request save
-local oldApply = applyToggleEffects
-function applyToggleEffects(featureName, featureTable)
-    oldApply(featureName, featureTable)
-    requestSaveConfig()
-end
-
-print("[DC] Client Loaded!")
-
--- EOF
+print("[DC] Fixed client loaded (testing="..tostring(state.cfg.testing)..")")
