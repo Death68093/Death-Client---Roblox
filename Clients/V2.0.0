@@ -1,0 +1,1514 @@
+-- Death Client v2.0.0 - All-in-one LocalScript (full working)
+-- Version & Testing top-level variables (edit Testing for debug: true -> PlayerGui)
+local Version = "2.0.0"
+local Testing = false -- if true UI goes to PlayerGui, if false UI goes to CoreGui
+
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
+local Workspace = game:GetService("Workspace")
+local StarterGui = game:GetService("StarterGui")
+
+-- Basic refs
+local LocalPlayer = Players.LocalPlayer
+if not LocalPlayer then return end
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local guiParent = (Testing and PlayerGui) or game:GetService("CoreGui")
+
+-- Character refs
+local character, humanoid, hrp
+local function bindCharacter(c)
+	character = c
+	humanoid = c:FindFirstChildOfClass("Humanoid") or c:WaitForChild("Humanoid")
+	hrp = c:FindFirstChild("HumanoidRootPart") or c:WaitForChild("HumanoidRootPart")
+end
+if LocalPlayer.Character then bindCharacter(LocalPlayer.Character) end
+LocalPlayer.CharacterAdded:Connect(bindCharacter)
+
+-- -------- CONFIG --------
+local config = {
+	version = Version,
+	theme = {
+		textColor = Color3.fromRGB(235,235,235),
+		backgroundColor = Color3.fromRGB(25,25,25),
+		accentOn = Color3.fromRGB(40,160,40),
+		accentOff = Color3.fromRGB(140,40,40),
+	},
+	settings = {
+		dodgeCooldown = 0.25,
+		wallhackTransparency = 0.5,
+		espTextSize = 14,
+		flySpeed = 120,
+	},
+	normal = {
+		movement = {
+			speed = { enabled = false, default = 16, speed = 32 },
+			jump = { enabled = false, defaultPower = 50, power = 70 },
+			infiniteJump = { enabled = false },
+			fly = { enabled = false, speed = 100 },
+		},
+		visual = {
+			esp = { enabled = false, team = "Any", color = Color3.fromRGB(255,50,50) },
+			tracers = { enabled = false, team = "Any", color = Color3.fromRGB(255,255,255) },
+			wallhack = { enabled = false, transparency = 0.5 },
+		},
+		combat = {
+			aimbot = {
+				enabled = false,
+				keyMode = "hold", -- "hold" or "toggle"
+				key = Enum.KeyCode.B,
+				fov = 120,
+				maxDistance = 300,
+				targetPart = "Head", -- "Head" or "HumanoidRootPart"
+				smoothing = 0.18,
+				prediction = 0.2,
+				priority = "distance",
+				requireVisible = false,
+				maxAimPerSecond = 20,
+				aimDelay = 0,
+			},
+			dodge = { enabled = false, key = Enum.KeyCode.LeftControl, dist = 12 },
+		},
+		utility = {
+			noclip = { enabled = false },
+			clicktp = { enabled = false, maxdist = 200 },
+			moneyscan = { enabled = false, names = {"Cash","Money","Gems","Wallet"} },
+			floatplatform = { enabled = false, size = Vector3.new(4,0.6,4), offset = Vector3.new(0,-3.1,0) }
+		},
+	},
+	keybinds = {
+		speed = Enum.KeyCode.Z,
+		jump = Enum.KeyCode.X,
+		infinitejump = Enum.KeyCode.C,
+		noclip = Enum.KeyCode.V,
+		aimbot = Enum.KeyCode.B,
+		esp = Enum.KeyCode.N,
+		tracers = Enum.KeyCode.M,
+		dodge = Enum.KeyCode.LeftControl,
+		fly = Enum.KeyCode.F,
+		clicktp = Enum.KeyCode.T,
+		moneyscan = Enum.KeyCode.G,
+		floatplatform = Enum.KeyCode.P,
+	},
+}
+-- Anti-Spectate
+config.normal.utility.antispectate = { 
+	enabled = false 
+}
+config.keybinds.antispectate = Enum.KeyCode.K
+
+
+
+
+-- HUBS
+local function StatHub()
+	-- Place ID: 83685989736222, Name: "+1 Stat point every second"
+local id = game.PlaceId
+if id ~= 83685989736222 then
+	warn("StatHub: Incorrect place ID. This hub only works in the '+1 Stat point every second' game.")
+	local warnBox = Instance.new("Message", workspace)
+	warnBox.Text = "StatHub: Incorrect place ID. This hub only works in the '+1 Stat point every second' game."
+	task.delay(5, function() warnBox:Destroy() end)
+	return
+end
+local TweenService = game:GetService("TweenService")
+
+
+local player = Players.LocalPlayer
+
+local root = character:WaitForChild("HumanoidRootPart")
+
+-- Create ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "StatUnlockGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- Create main frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 150)
+frame.Position = UDim2.new(0.5, -150, 0.5, -75)
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+-- Title
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+title.Text = "+1 Stat / Unlock Zones"
+title.TextColor3 = Color3.fromRGB(255,255,255)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 20
+title.Parent = frame
+
+-- Make frame draggable
+local dragging, dragInput, dragStart, startPos
+title.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = frame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+title.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement then
+		dragInput = input
+	end
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+	if dragging and input == dragInput then
+		local delta = input.Position - dragStart
+		frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+			startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+-- +1000 wins button
+local statBtn = Instance.new("TextButton")
+statBtn.Size = UDim2.new(0.9, 0, 0, 40)
+statBtn.Position = UDim2.new(0.05, 0, 0.35, 0)
+statBtn.Text = "+1000 wins"
+statBtn.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
+statBtn.TextColor3 = Color3.fromRGB(255,255,255)
+statBtn.Font = Enum.Font.SourceSansBold
+statBtn.TextSize = 18
+statBtn.Parent = frame
+
+statBtn.MouseButton1Click:Connect(function()
+	local targetPart = Workspace:GetChildren()[385]
+	if targetPart and targetPart:IsA("BasePart") then
+		-- start 10 studs below the part
+		root.CFrame = targetPart.CFrame - Vector3.new(0, 10, 0)
+		-- tween up
+		local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		local goal = {CFrame = targetPart.CFrame + Vector3.new(0, 2, 0)}
+		local tween = TweenService:Create(root, tweenInfo, goal)
+		tween:Play()
+	else
+		warn("Target part doesn't exist or isn't a BasePart!")
+	end
+end)
+
+-- Unlock Zones button
+local zoneBtn = Instance.new("TextButton")
+zoneBtn.Size = UDim2.new(0.9, 0, 0, 40)
+zoneBtn.Position = UDim2.new(0.05, 0, 0.65, 0)
+zoneBtn.Text = "Unlock All Zones"
+zoneBtn.BackgroundColor3 = Color3.fromRGB(34, 139, 34)
+zoneBtn.TextColor3 = Color3.fromRGB(255,255,255)
+zoneBtn.Font = Enum.Font.SourceSansBold
+zoneBtn.TextSize = 18
+zoneBtn.Parent = frame
+
+zoneBtn.MouseButton1Click:Connect(function()
+	for _, v in ipairs(Workspace:GetChildren()) do
+		local name = v.Name
+		if name == "CandyZone" 
+			or name == "CaveZone" 
+			or name == "CosmicZone" 
+			or name == "DesertZone" 
+			or name == "LavaZone" 
+			or name == "OceanZone" then
+			v:Destroy()
+		end
+	end
+end)
+end
+
+local function HideAndSeekHub()
+    if game.PlaceId ~= 205224386 then
+        warn("HideAndSeekHub: Incorrect place ID. This hub only works in 'Hide and Seek Extreme'.")
+        local warnBox = Instance.new("Message", workspace)
+        warnBox.Text = "HideAndSeekHub: Incorrect place ID. This hub only works in 'Hide and Seek Extreme'."
+        task.delay(5, function() warnBox:Destroy() end)
+        return
+    end
+
+    local plr = Players.LocalPlayer
+    local char = plr.Character or plr.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+
+    -- Create GUI
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "HideAndSeekHubGUI"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = plr:WaitForChild("PlayerGui")
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 300, 0, 120)
+    frame.Position = UDim2.new(0.5, -150, 0.5, -60)
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    frame.BorderSizePixel = 0
+    frame.Parent = screenGui
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+
+    -- Title bar (for dragging)
+    local titleBar = Instance.new("Frame")
+    titleBar.Size = UDim2.new(1, 0, 0, 30)
+    titleBar.Position = UDim2.new(0, 0, 0, 0)
+    titleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    titleBar.Parent = frame
+    Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 8)
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -30, 1, 0)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundTransparency = 1
+    title.Text = "Hide and Seek Hub"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 18
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = titleBar
+
+    -- Close button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -30, 0, 0)
+    closeBtn.Text = "X"
+    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeBtn.BackgroundTransparency = 1
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 18
+    closeBtn.Parent = titleBar
+    closeBtn.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+    end)
+
+    -- Tag All button
+    local tagButton = Instance.new("TextButton")
+    tagButton.Size = UDim2.new(0.9, 0, 0, 40)
+    tagButton.Position = UDim2.new(0.05, 0, 0.3, 0)
+    tagButton.Text = "Tag All Players"
+    tagButton.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
+    tagButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tagButton.Font = Enum.Font.GothamBold
+    tagButton.TextSize = 16
+    tagButton.Parent = frame
+    Instance.new("UICorner", tagButton).CornerRadius = UDim.new(0, 6)
+
+    -- Button logic
+    tagButton.MouseButton1Click:Connect(function()
+        for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+            if player ~= plr and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                hrp.CFrame = player.Character.HumanoidRootPart.CFrame
+                task.wait(0.5)
+            end
+        end
+    end)
+
+    -- Drag functionality
+    local dragging, dragInput, dragStart, startPos
+
+    local function update(input)
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                                   startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+
+    titleBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    titleBar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            update(input)
+        end
+    end)
+end
+
+
+
+-- END HUBS
+
+
+
+
+
+-- helper state
+local UI = {}
+local featureButtons = {}
+local settingDialogs = {}
+local bindingFeature = nil
+local bindingPrompt = nil
+local espGuis = {}
+local tracerLines = {}
+local wallhackCache = {}
+local noclipCache = {}
+local lastDodge = 0
+local isFlying = false
+local flyPart -- not used; using BodyVelocity + BodyGyro
+local flyBV, flyBG
+local floatPlatformPart = nil
+local lastPlatformY = nil
+local aimHeld = false
+local aimToggle = false
+local lastAimTime = 0
+
+-- ---------- UTIL ----------
+local function safeParent(obj, parent)
+	pcall(function() obj.Parent = parent end)
+end
+local function keyName(k) return (k and tostring(k):gsub("Enum.KeyCode.","")) or "-" end
+local function tobool(v)
+	if type(v)=="boolean" then return v end
+	if type(v)=="string" then local s=v:lower(); return s=="true" or s=="1" or s=="yes" end
+	if type(v)=="number" then return v~=0 end
+	return false
+end
+local function parseNumber(s, fallback) local n = tonumber(s) return n or fallback end
+
+-- ---------- PERSISTENT GUI (create container) ----------
+local function createBaseGui()
+	local sg = Instance.new("ScreenGui")
+	sg.Name = "DeathClientMenu_v"..config.version
+	sg.ResetOnSpawn = false
+	safeParent(sg, guiParent)
+	return sg
+end
+
+-- ---------- CORE UI BUILD ----------
+local function buildUI()
+	local screenGui = createBaseGui()
+	UI.screenGui = screenGui
+
+	-- main frame
+	local main = Instance.new("Frame")
+	main.Name = "Main"
+	main.Size = UDim2.new(0,420,0,520)
+	main.Position = UDim2.new(0.5,-210,0.5,-260)
+	main.BackgroundColor3 = config.theme.backgroundColor
+	main.BorderSizePixel = 0
+	main.Active = true
+	main.Draggable = true
+	main.Parent = screenGui
+	Instance.new("UICorner", main).CornerRadius = UDim.new(0,10)
+
+	-- header
+	local header = Instance.new("Frame", main)
+	header.Size = UDim2.new(1,0,0,40)
+	header.Position = UDim2.new(0,0,0,0)
+	header.BackgroundTransparency = 1
+	local title = Instance.new("TextLabel", header)
+	title.Size = UDim2.new(1,-10,1,0)
+	title.Position = UDim2.new(0,5,0,0)
+	title.BackgroundTransparency = 1
+	title.Text = "Death Client v"..config.version
+	title.TextColor3 = config.theme.textColor
+	title.Font = Enum.Font.GothamBold
+	title.TextSize = 18
+	title.TextXAlignment = Enum.TextXAlignment.Left
+
+	-- tabs area
+	local tabs = Instance.new("Frame", main)
+	tabs.Size = UDim2.new(1,0,0,36)
+	tabs.Position = UDim2.new(0,0,0,40)
+	tabs.BackgroundTransparency = 1
+
+	-- tab buttons helper
+	local function mkTab(text, x)
+		local b = Instance.new("TextButton", tabs)
+		b.Size = UDim2.new(0,100,1,0)
+		b.Position = UDim2.new(0,x,0,0)
+		b.BackgroundColor3 = Color3.fromRGB(45,45,45)
+		b.Text = text
+		b.Font = Enum.Font.Gotham
+		b.TextSize = 14
+		Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
+		return b
+	end
+
+	local btnMain = mkTab("Menu", 8)
+	local btnScripts = mkTab("Script Hub", 116)
+	local btnOther = mkTab("Teleports", 224)
+	local btnCredits = mkTab("Credits", 332)
+
+	-- content container
+	local content = Instance.new("Frame", main)
+	content.Size = UDim2.new(1,-10,1,-96)
+	content.Position = UDim2.new(0,5,0,84)
+	content.BackgroundTransparency = 1
+
+	-- scroll area for features
+	local sc = Instance.new("ScrollingFrame", content)
+	sc.Size = UDim2.new(1,0,1,0)
+	sc.CanvasSize = UDim2.new(0,0)
+	sc.BackgroundTransparency = 1
+	sc.ScrollBarThickness = 6
+	local listLayout = Instance.new("UIListLayout", sc)
+	listLayout.Padding = UDim.new(0,6)
+
+	-- convenience to update canvas size
+	local function updateCanvas()
+		wait()
+		local size = listLayout.AbsoluteContentSize
+		sc.CanvasSize = UDim2.new(0,0,0,size.Y + 12)
+	end
+
+	-- small helper to create a row (toggle + key + settings)
+	local function addRow(displayName, featTable, schema, keyname)
+		local row = Instance.new("Frame")
+		row.Size = UDim2.new(1, -12, 0, 40)
+		row.BackgroundTransparency = 1
+		row.Parent = sc
+
+		local toggle = Instance.new("TextButton", row)
+		toggle.Size = UDim2.new(0.62, 0, 1, 0)
+		toggle.Position = UDim2.new(0, 0, 0, 0)
+		toggle.AutoButtonColor = false
+		toggle.Font = Enum.Font.Gotham
+		toggle.TextSize = 14
+		toggle.TextColor3 = config.theme.textColor
+		Instance.new("UICorner", toggle).CornerRadius = UDim.new(0,6)
+
+		local function refresh()
+			local on = featTable.enabled and true or false
+			toggle.BackgroundColor3 = on and config.theme.accentOn or config.theme.accentOff
+			toggle.Text = displayName.." : "..(on and "ON" or "OFF")
+		end
+		refresh()
+
+		toggle.MouseButton1Click:Connect(function()
+			featTable.enabled = not featTable.enabled
+			refresh()
+			-- immediate behavior hooks (where needed)
+			if keyname == "noclip" then applyNoclip(featTable.enabled) end
+			if keyname == "wallhack" then applyWallhack(featTable.enabled) end
+			if keyname == "fly" then setFly(featTable.enabled) end
+			if keyname == "floatplatform" then toggleFloatPlatform(featTable.enabled) end
+			if keyname == "esp" then syncEsp() end
+		end)
+
+		local keyBtn = Instance.new("TextButton", row)
+		keyBtn.Size = UDim2.new(0.21, -6, 1, 0)
+		keyBtn.Position = UDim2.new(0.62, 6, 0, 0)
+		keyBtn.Font = Enum.Font.Gotham
+		keyBtn.TextSize = 13
+		keyBtn.TextColor3 = config.theme.textColor
+		keyBtn.BackgroundColor3 = Color3.fromRGB(45,45,45)
+		Instance.new("UICorner", keyBtn).CornerRadius = UDim.new(0,6)
+		keyBtn.Text = keyName(config.keybinds[(keyname or displayName):lower()] or config.keybinds[displayName:lower()])
+
+		keyBtn.MouseButton1Click:Connect(function()
+			showBindingPrompt((keyname or displayName):lower(), keyBtn)
+		end)
+
+		local sBtn = Instance.new("TextButton", row)
+		sBtn.Size = UDim2.new(0.17, 0, 1, 0)
+		sBtn.Position = UDim2.new(0.83, 0, 0, 0)
+		sBtn.Text = "⚙"
+		sBtn.Font = Enum.Font.Gotham
+		sBtn.TextSize = 16
+		sBtn.TextColor3 = config.theme.textColor
+		sBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+		Instance.new("UICorner", sBtn).CornerRadius = UDim.new(0,6)
+
+		-- settings modal
+		sBtn.MouseButton1Click:Connect(function()
+			if settingDialogs[displayName] then
+				settingDialogs[displayName].Enabled = not settingDialogs[displayName].Enabled
+				return
+			end
+			if not schema or #schema == 0 then return end
+			local modal = Instance.new("Frame", screenGui)
+			modal.Size = UDim2.new(0,360,0,220)
+			modal.Position = UDim2.new(0.5,-180,0.5,-110)
+			modal.BackgroundColor3 = Color3.fromRGB(30,30,30)
+			modal.BorderSizePixel = 0
+			Instance.new("UICorner", modal).CornerRadius = UDim.new(0,8)
+			settingDialogs[displayName] = modal
+
+			local y = 12
+			for _, s in ipairs(schema) do
+				local lbl = Instance.new("TextLabel", modal)
+				lbl.Size = UDim2.new(0.58, -12, 0, 24)
+				lbl.Position = UDim2.new(0,8,0,y)
+				lbl.BackgroundTransparency = 1
+				lbl.Text = s.label
+				lbl.TextColor3 = config.theme.textColor
+				lbl.Font = Enum.Font.Gotham
+				lbl.TextSize = 13
+
+				local box = Instance.new("TextBox", modal)
+				box.Size = UDim2.new(0.38, -12, 0, 24)
+				box.Position = UDim2.new(0.58, -12, 0, y)
+				box.PlaceholderText = tostring(s.get())
+				box.Text = ""
+				box.Font = Enum.Font.Gotham
+				box.TextSize = 13
+				box.TextColor3 = config.theme.textColor
+				box.BackgroundColor3 = Color3.fromRGB(45,45,45)
+				Instance.new("UICorner", box).CornerRadius = UDim.new(0,6)
+
+				local apply = Instance.new("TextButton", modal)
+				apply.Size = UDim2.new(1, -16, 0, 28)
+				apply.Position = UDim2.new(0,8,0,y+32)
+				apply.Text = "Apply"
+				apply.Font = Enum.Font.Gotham
+				apply.TextSize = 13
+				apply.BackgroundColor3 = Color3.fromRGB(40,120,40)
+				Instance.new("UICorner", apply).CornerRadius = UDim.new(0,6)
+
+				apply.MouseButton1Click:Connect(function()
+					local val = box.Text ~= "" and box.Text or tostring(s.get())
+					if s.type == "number" then s.set(parseNumber(val, s.get())) end
+					if s.type == "boolean" then s.set(tobool(val)) end
+					if s.type == "text" then s.set(tostring(val)) end
+				end)
+
+				y = y + 72
+			end
+
+			local close = Instance.new("TextButton", modal)
+			close.Size = UDim2.new(1, -16, 0, 28)
+			close.Position = UDim2.new(0,8,1,-36)
+			close.Text = "Close"
+			close.Font = Enum.Font.Gotham
+			close.TextSize = 13
+			close.BackgroundColor3 = Color3.fromRGB(135,40,40)
+			Instance.new("UICorner", close).CornerRadius = UDim.new(0,6)
+			close.MouseButton1Click:Connect(function()
+				modal:Destroy()
+				settingDialogs[displayName] = nil
+			end)
+		end)
+
+		featureButtons[(keyname or displayName):lower()] = { button = toggle, keyLabel = keyBtn, refresh = refresh, feat = featTable }
+		updateCanvas()
+		return row
+	end
+
+	-- -------- build feature rows --------
+	-- Movement
+	for name, feat in pairs(config.normal.movement) do
+		local schema = {}
+		if name == "speed" then
+			schema = {
+				{ label="Speed", type="number", get=function() return feat.speed end, set=function(v) feat.speed = v end},
+				{ label="Default", type="number", get=function() return feat.default end, set=function(v) feat.default = v end},
+			}
+		elseif name == "jump" then
+			schema = {
+				{ label="JumpPower", type="number", get=function() return feat.power end, set=function(v) feat.power = v end},
+				{ label="Default", type="number", get=function() return feat.defaultPower end, set=function(v) feat.defaultPower = v end},
+			}
+		elseif name == "fly" then
+			schema = {
+				{ label="Fly Speed", type="number", get=function() return feat.speed end, set=function(v) feat.speed = v end},
+			}
+		end
+		addRow(name:sub(1,1):upper()..name:sub(2), feat, schema, name:lower())
+	end
+
+	-- Visual
+	for name, feat in pairs(config.normal.visual) do
+		local schema = {}
+		if name == "wallhack" then
+			schema = { { label="Transparency", type="number", get=function() return feat.transparency end, set=function(v) feat.transparency = v end } }
+		elseif name == "esp" then
+			schema = { { label="Text Size", type="number", get=function() return config.settings.espTextSize end, set=function(v) config.settings.espTextSize = v end } }
+		end
+		addRow(name:sub(1,1):upper()..name:sub(2), feat, schema, name:lower())
+	end
+
+	-- Combat
+	for name, feat in pairs(config.normal.combat) do
+		local schema = {}
+		if name == "aimbot" then
+			schema = {
+				{ label="Enabled", type="boolean", get=function() return feat.enabled end, set=function(v) feat.enabled = v end},
+				{ label="KeyMode", type="text", get=function() return feat.keyMode end, set=function(v) feat.keyMode = tostring(v) end},
+				{ label="FOV", type="number", get=function() return feat.fov end, set=function(v) feat.fov = v end},
+				{ label="Smoothing", type="number", get=function() return feat.smoothing end, set=function(v) feat.smoothing = math.clamp(v,0,1) end},
+			}
+		elseif name == "dodge" then
+			schema = {
+				{ label="Distance", type="number", get=function() return feat.dist end, set=function(v) feat.dist = v end},
+				{ label="Cooldown", type="number", get=function() return config.settings.dodgeCooldown end, set=function(v) config.settings.dodgeCooldown = v end},
+			}
+		end
+		addRow(name:sub(1,1):upper()..name:sub(2), feat, schema, name:lower())
+	end
+
+	-- Utility
+	for name, feat in pairs(config.normal.utility) do
+		local schema = {}
+
+		if name == "moneyscan" then
+			schema = {
+				{ label="Names (comma)", type="text", get=function() return table.concat(feat.names, ",") end, set=function(v)
+					local t = {}
+					for s in string.gmatch(v, "[^,]+") do table.insert(t, s:gsub("^%s*(.-)%s*$","%1")) end
+					feat.names = t
+				end}
+			}
+		elseif name == "Anti-Spectate" then
+			schema = {
+				{ label="Enabled", type="boolean", get=function() return feat.enabled end, set=function(v) feat.enabled = v end }
+			}
+		end
+
+		addRow(name:sub(1,1):upper()..name:sub(2), feat, schema, name:lower())
+	end
+
+
+-- Main Script Hub tab setup
+local hubFrame = Instance.new("Frame", content)
+hubFrame.Size = UDim2.new(1,0,1,0)
+hubFrame.Visible = false
+hubFrame.BackgroundTransparency = 1
+
+local hubText = Instance.new("TextLabel", hubFrame)
+hubText.Size = UDim2.new(1,0,0,40)
+hubText.Position = UDim2.new(0,0,0,0)
+hubText.Text = "Script Hubs"
+hubText.BackgroundTransparency = 1
+hubText.TextColor3 = config.theme.textColor
+hubText.Font = Enum.Font.Gotham
+hubText.TextSize = 16
+hubText.TextXAlignment = Enum.TextXAlignment.Left
+hubText.TextYAlignment = Enum.TextYAlignment.Center
+hubText.Position = UDim2.new(0,10,0,0)
+
+-- Container for hub buttons (scrollable)
+local hubButtonsFrame = Instance.new("ScrollingFrame", hubFrame)
+hubButtonsFrame.Size = UDim2.new(1,-20,1,-50)
+hubButtonsFrame.Position = UDim2.new(0,10,0,50)
+hubButtonsFrame.BackgroundTransparency = 1
+hubButtonsFrame.ScrollBarThickness = 8
+hubButtonsFrame.CanvasSize = UDim2.new(0,0,0,0)
+hubButtonsFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+local hubButtonsLayout = Instance.new("UIListLayout", hubButtonsFrame)
+hubButtonsLayout.Padding = UDim.new(0,8)
+hubButtonsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+hubButtonsFrame:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+    hubButtonsFrame.CanvasSize = UDim2.new(0,0,0,hubButtonsLayout.AbsoluteContentSize.Y + 12)
+end)
+
+-- Function to add a hub button
+local function addHub(name, hubFunction)
+	local btn = Instance.new("TextButton", hubButtonsFrame)
+	btn.Size = UDim2.new(1,0,0,36)
+	btn.BackgroundColor3 = config.theme.accentOn
+	btn.TextColor3 = Color3.fromRGB(255,255,255)
+	btn.Font = Enum.Font.Gotham
+	btn.TextSize = 14
+	btn.Text = name
+	btn.AutoButtonColor = true
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
+
+	btn.MouseButton1Click:Connect(hubFunction)
+end
+
+
+
+-- Add hub buttons
+addHub("+1 Stat point every second", StatHub)
+addHub("Hide and Seek Extreme", HideAndSeekHub)
+
+
+	
+
+	-- ================= TELEPORTS TAB (IMPROVED) =================
+local teleports = {}
+
+local tpFrame = Instance.new("Frame", content)
+tpFrame.Size = UDim2.new(1,0,1,0)
+tpFrame.Visible = false
+tpFrame.BackgroundTransparency = 1
+
+-- title
+local tpTitle = Instance.new("TextLabel", tpFrame)
+tpTitle.Size = UDim2.new(1,0,0,36)
+tpTitle.Text = "Teleports"
+tpTitle.BackgroundTransparency = 1
+tpTitle.TextColor3 = config.theme.textColor
+tpTitle.Font = Enum.Font.GothamBold
+tpTitle.TextSize = 16
+
+-- name input
+local nameBox = Instance.new("TextBox", tpFrame)
+nameBox.Size = UDim2.new(0.6,0,0,30)
+nameBox.Position = UDim2.new(0.02,0,0,42)
+nameBox.PlaceholderText = "Teleport name"
+nameBox.Font = Enum.Font.Gotham
+nameBox.TextSize = 14
+nameBox.BackgroundColor3 = Color3.fromRGB(45,45,45)
+nameBox.TextColor3 = config.theme.textColor
+Instance.new("UICorner", nameBox)
+
+-- save button
+local saveBtn = Instance.new("TextButton", tpFrame)
+saveBtn.Size = UDim2.new(0.32,0,0,30)
+saveBtn.Position = UDim2.new(0.66,0,0,42)
+saveBtn.Text = "Save"
+saveBtn.Font = Enum.Font.Gotham
+saveBtn.TextSize = 14
+saveBtn.BackgroundColor3 = config.theme.accentOn
+saveBtn.TextColor3 = Color3.new(1,1,1)
+Instance.new("UICorner", saveBtn)
+
+-- list
+local list = Instance.new("ScrollingFrame", tpFrame)
+list.Size = UDim2.new(1,-12,1,-86)
+list.Position = UDim2.new(0,6,0,84)
+list.CanvasSize = UDim2.new(0,0,0,0)
+list.ScrollBarThickness = 6
+list.BackgroundTransparency = 1
+
+local layout = Instance.new("UIListLayout", list)
+layout.Padding = UDim.new(0,6)
+
+local function refreshCanvas()
+	task.wait()
+	list.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y + 8)
+end
+
+local function createTPRow(tp)
+	local row = Instance.new("Frame", list)
+	row.Size = UDim2.new(1,0,0,36)
+	row.BackgroundColor3 = Color3.fromRGB(35,35,35)
+	Instance.new("UICorner", row)
+
+	local lbl = Instance.new("TextLabel", row)
+	lbl.Size = UDim2.new(0.45,0,1,0)
+	lbl.Text = tp.name
+	lbl.BackgroundTransparency = 1
+	lbl.TextColor3 = config.theme.textColor
+	lbl.Font = Enum.Font.Gotham
+	lbl.TextSize = 14
+
+	local go = Instance.new("TextButton", row)
+	go.Size = UDim2.new(0.25,0,1,-6)
+	go.Position = UDim2.new(0.46,0,0,3)
+	go.Text = "TP"
+	go.Font = Enum.Font.Gotham
+	go.TextSize = 13
+	go.BackgroundColor3 = config.theme.accentOn
+	Instance.new("UICorner", go)
+
+	go.MouseButton1Click:Connect(function()
+		if hrp then
+			hrp.CFrame = tp.cf + Vector3.new(0,3,0)
+		end
+	end)
+
+	local del = Instance.new("TextButton", row)
+	del.Size = UDim2.new(0.22,0,1,-6)
+	del.Position = UDim2.new(0.73,0,0,3)
+	del.Text = "DEL"
+	del.Font = Enum.Font.Gotham
+	del.TextSize = 13
+	del.BackgroundColor3 = config.theme.accentOff
+	Instance.new("UICorner", del)
+
+	del.MouseButton1Click:Connect(function()
+		for i,v in ipairs(teleports) do
+			if v == tp then
+				table.remove(teleports, i)
+				break
+			end
+		end
+		row:Destroy()
+		refreshCanvas()
+	end)
+
+	refreshCanvas()
+end
+
+saveBtn.MouseButton1Click:Connect(function()
+	if not hrp then return end
+	local name = nameBox.Text ~= "" and nameBox.Text or ("TP "..#teleports+1)
+	local tp = { name = name, cf = hrp.CFrame }
+	table.insert(teleports, tp)
+	createTPRow(tp)
+	nameBox.Text = ""
+end)
+	-- end teleports tab
+
+	-- Credits
+	local creditsFrame = Instance.new("Frame", content)
+	creditsFrame.Size = UDim2.new(1,0,1,0)
+	creditsFrame.Visible = false
+	creditsFrame.BackgroundTransparency = 1
+	local creditsLabel = Instance.new("TextLabel", creditsFrame)
+	creditsLabel.Size = UDim2.new(1,0,1,0)
+	creditsLabel.Position = UDim2.new(0,0,0,0)
+	creditsLabel.Text = "Credits\nBuilt with ❤️\nVersion "..config.version
+	creditsLabel.BackgroundTransparency = 1
+	creditsLabel.TextColor3 = config.theme.textColor
+	creditsLabel.Font = Enum.Font.Gotham
+	creditsLabel.TextSize = 16
+	creditsLabel.TextWrapped = true
+
+	-- tab switching
+	btnMain.MouseButton1Click:Connect(function()
+		sc.Visible = true; hubFrame.Visible = false; tpFrame.Visible = false; creditsFrame.Visible = false
+	end)
+	btnScripts.MouseButton1Click:Connect(function()
+		sc.Visible = false; hubFrame.Visible = true; tpFrame.Visible = false; creditsFrame.Visible = false
+	end)
+	btnOther.MouseButton1Click:Connect(function()
+		sc.Visible = false; hubFrame.Visible = false; tpFrame.Visible = true; creditsFrame.Visible = false
+
+	end)
+	btnCredits.MouseButton1Click:Connect(function()
+		sc.Visible = false; hubFrame.Visible = false; tpFrame.Visible = false; creditsFrame.Visible = true
+	end)
+
+	-- store references
+	UI.main = main
+	UI.screenGui = screenGui
+	UI.scrolling = sc
+	UI.updateCanvas = updateCanvas
+
+	return screenGui
+end
+
+-- show binding prompt to capture the next key
+function showBindingPrompt(featureName, keyBtn)
+	if bindingPrompt and bindingPrompt.Parent then bindingPrompt:Destroy() end
+	bindingFeature = featureName
+	local sg = UI.screenGui or createBaseGui()
+	local modal = Instance.new("Frame", sg)
+	modal.Size = UDim2.new(0,300,0,90)
+	modal.Position = UDim2.new(0.5,-150,0.5,-45)
+	modal.BackgroundColor3 = Color3.fromRGB(30,30,30)
+	modal.BorderSizePixel = 0
+	Instance.new("UICorner", modal).CornerRadius = UDim.new(0,8)
+	local txt = Instance.new("TextLabel", modal)
+	txt.Size = UDim2.new(1,-16,0,48)
+	txt.Position = UDim2.new(0,8,0,8)
+	txt.Text = "Press any key to bind: "..tostring(featureName)
+	txt.TextColor3 = config.theme.textColor
+	txt.BackgroundTransparency = 1
+	local cancel = Instance.new("TextButton", modal)
+	cancel.Size = UDim2.new(1,-16,0,28)
+	cancel.Position = UDim2.new(0,8,1,-36)
+	cancel.BackgroundColor3 = Color3.fromRGB(135,40,40)
+	cancel.Text = "Cancel"
+	cancel.Font = Enum.Font.Gotham
+	Instance.new("UICorner", cancel).CornerRadius = UDim.new(0,6)
+	cancel.MouseButton1Click:Connect(function()
+		bindingFeature = nil
+		modal:Destroy()
+		bindingPrompt = nil
+	end)
+	bindingPrompt = modal
+	-- remember button to update label
+	bindingPrompt._keyBtn = keyBtn
+end
+
+-- capture key presses for binding and features
+UserInputService.InputBegan:Connect(function(input, processed)
+	if input.UserInputType == Enum.UserInputType.Keyboard then
+		-- if binding feature active
+		if bindingFeature then
+			local kc = input.KeyCode
+			if kc and kc ~= Enum.KeyCode.Unknown then
+				-- save to config.keybinds
+				config.keybinds[bindingFeature] = kc
+				-- keep nested duplicate keys in sync
+				if config.normal.combat[bindingFeature] and config.normal.combat[bindingFeature].key ~= nil then
+					config.normal.combat[bindingFeature].key = kc
+				end
+				-- update UI label if present
+				if bindingPrompt and bindingPrompt._keyBtn and bindingPrompt._keyBtn.Parent then
+					bindingPrompt._keyBtn.Text = keyName(kc)
+				end
+				if bindingPrompt and bindingPrompt.Parent then bindingPrompt:Destroy() end
+				bindingFeature = nil
+				bindingPrompt = nil
+			end
+			return
+		end
+
+		-- ignore if processing by other GUI
+		if processed then return end
+
+		-- handle toggles via keybinds
+		for featName, keycode in pairs(config.keybinds) do
+			if input.KeyCode == keycode then
+				local lname = featName:lower()
+				-- locate feature table
+				local feat = config.normal.movement[lname] or config.normal.visual[lname] or config.normal.combat[lname] or config.normal.utility[lname]
+				if feat and feat.enabled ~= nil then
+					-- special for aimbot hold/toggle handled below
+					if lname == "aimbot" then
+						local acfg = config.normal.combat.aimbot
+						if acfg.keyMode == "hold" then
+							aimHeld = true
+						else
+							acfg.enabled = not acfg.enabled
+							-- update UI
+							if featureButtons["aimbot"] and featureButtons["aimbot"].refresh then featureButtons["aimbot"].refresh() end
+						end
+					else
+						feat.enabled = not feat.enabled
+						if featureButtons[lname] and featureButtons[lname].refresh then featureButtons[lname].refresh() end
+						-- immediate apply for some modules
+						if lname == "noclip" then applyNoclip(feat.enabled) end
+						if lname == "wallhack" then applyWallhack(feat.enabled) end
+						if lname == "fly" then setFly(feat.enabled) end
+						if lname == "floatplatform" then toggleFloatPlatform(feat.enabled) end
+						if lname == "esp" then syncEsp() end
+					end
+				end
+			end
+		end
+
+		-- infinite jump toggling handled on InputBegan below
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.KeyCode == config.keybinds.aimbot then
+		aimHeld = false
+	end
+end)
+
+-- ---------- MODULE IMPLEMENTATIONS ----------
+
+-- Noclip
+function applyNoclip(on)
+	if not character then return end
+	if on then
+		noclipCache = {}
+		for _, part in ipairs(character:GetDescendants()) do
+			if part:IsA("BasePart") then
+				noclipCache[part] = part.CanCollide
+				part.CanCollide = false
+			end
+		end
+	else
+		for p,prev in pairs(noclipCache) do
+			if p and p.Parent then
+				p.CanCollide = prev
+			end
+		end
+		noclipCache = {}
+	end
+end
+
+-- Wallhack (change transparency of non-character parts)
+function applyWallhack(on)
+	if on == (next(wallhackCache) ~= nil) and on==false then return end
+	if on then
+		for _, part in ipairs(Workspace:GetDescendants()) do
+			if part:IsA("BasePart") and not part:IsDescendantOf(character) then
+				if not wallhackCache[part] then
+					wallhackCache[part] = { part.Transparency, part.CastShadow }
+					pcall(function()
+						part.Transparency = config.normal.visual.wallhack.transparency or config.settings.wallhackTransparency
+						part.CastShadow = false
+					end)
+				end
+			end
+		end
+	else
+		for p, data in pairs(wallhackCache) do
+			if p and p.Parent then
+				p.Transparency = data[1]
+				p.CastShadow = data[2]
+			end
+		end
+		wallhackCache = {}
+	end
+end
+
+-- Floating platform (stays underfoot; if player moves up, platform moves up; otherwise stays)
+function createFloatPlatform()
+	if floatPlatformPart and floatPlatformPart.Parent then return end
+	local p = Instance.new("Part")
+	p.Name = "DeathFloatPlatform"
+	p.Size = config.normal.utility.floatplatform.size or Vector3.new(4,0.6,4)
+	p.Anchored = true
+	p.CanCollide = true
+	p.Transparency = 0.15
+	p.Material = Enum.Material.Neon
+	p.Color = Color3.fromRGB(20,20,20)
+	safeParent(p, Workspace)
+	floatPlatformPart = p
+	lastPlatformY = nil
+end
+
+function toggleFloatPlatform(on)
+	if on then
+		createFloatPlatform()
+	else
+		if floatPlatformPart then
+			pcall(function() floatPlatformPart:Destroy() end)
+			floatPlatformPart = nil
+			lastPlatformY = nil
+		end
+	end
+end
+
+-- Click teleport
+function tryClickTeleport(mouse)
+	if not config.normal.utility.clicktp.enabled or not hrp or not mouse then return end
+	local target = mouse.Target
+	if not target then return end
+	local pos = mouse.Hit.Position
+	if (pos - hrp.Position).Magnitude <= (config.normal.utility.clicktp.maxdist or 200) then
+		hrp.CFrame = CFrame.new(pos + Vector3.new(0,3,0))
+	end
+end
+
+-- Dodge (instant lateral move)
+function attemptDodge(dir)
+	if not hrp then return end
+	local dist = config.normal.combat.dodge.dist or 12
+	local move = Vector3.new()
+	if dir == "left" then move = -hrp.CFrame.RightVector * dist
+	elseif dir == "right" then move = hrp.CFrame.RightVector * dist
+	elseif dir == "forward" then move = hrp.CFrame.LookVector * dist
+	elseif dir == "back" then move = -hrp.CFrame.LookVector * dist
+	end
+	hrp.CFrame = hrp.CFrame + Vector3.new(move.X, 0, move.Z)
+end
+-- Double-tap dodge state
+local lastTap = { W = 0, A = 0, S = 0, D = 0 }
+local doubleTapThreshold = 0.25 -- seconds between taps
+
+UserInputService.InputBegan:Connect(function(input, processed)
+	if input.UserInputType == Enum.UserInputType.Keyboard then
+		local key = input.KeyCode
+		local now = tick()
+
+		if config.normal.combat.dodge.enabled then
+			local dir = nil
+			if key == Enum.KeyCode.W then dir = "forward" end
+			if key == Enum.KeyCode.S then dir = "back" end
+			if key == Enum.KeyCode.A then dir = "left" end
+			if key == Enum.KeyCode.D then dir = "right" end
+
+			if dir then
+				if now - (lastTap[key.Name] or 0) <= doubleTapThreshold then
+					attemptDodge(dir)
+					lastTap[key.Name] = 0
+				else
+					lastTap[key.Name] = now
+				end
+			end
+		end
+	end
+end)
+
+-- Fly using BodyVelocity + BodyGyro for stable camera-relative flight
+flyBV = Instance.new("BodyVelocity")
+flyBV.MaxForce = Vector3.new(1e5,1e5,1e5)
+flyBV.Velocity = Vector3.new(0,0,0)
+flyBG = Instance.new("BodyGyro")
+flyBG.MaxTorque = Vector3.new(4e5,4e5,4e5)
+
+function setFly(on)
+	if not hrp then return end
+	if on then
+		if not flyBV.Parent then flyBV.Parent = hrp end
+		if not flyBG.Parent then flyBG.Parent = hrp end
+		isFlying = true
+	else
+		pcall(function()
+			if flyBV.Parent then flyBV.Parent = nil end
+			if flyBG.Parent then flyBG.Parent = nil end
+		end)
+		isFlying = false
+	end
+end
+
+-- ESP: Billboard GUI per player
+function createEspFor(pl)
+	if espGuis[pl] then return end
+	if not pl.Character or not pl.Character:FindFirstChild("HumanoidRootPart") then return end
+	local adornee = pl.Character:FindFirstChild("Head") or pl.Character:FindFirstChild("HumanoidRootPart")
+	if not adornee then return end
+	local bb = Instance.new("BillboardGui")
+	bb.Name = "DeathESP"
+	bb.Adornee = adornee
+	bb.Size = UDim2.new(0,120,0,40)
+	bb.AlwaysOnTop = true
+	safeParent(bb, PlayerGui) -- ESP lives in PlayerGui for compatibility
+	local f = Instance.new("Frame", bb)
+	f.Size = UDim2.new(1,0,1,0)
+	f.BackgroundTransparency = 0.6
+	f.BackgroundColor3 = config.normal.visual.esp.color
+	local label = Instance.new("TextLabel", bb)
+	label.Size = UDim2.new(1,0,1,0)
+	label.BackgroundTransparency = 1
+	label.Text = pl.Name
+	label.TextColor3 = Color3.new(1,1,1)
+	label.Font = Enum.Font.Gotham
+	label.TextSize = config.settings.espTextSize or 14
+	espGuis[pl] = bb
+	-- optional Drawing tracer
+	pcall(function()
+		if Drawing then
+			local ln = Drawing.new("Line")
+			ln.Visible = false
+			ln.Thickness = 1
+			ln.Color = config.normal.visual.tracers.color
+			tracerLines[pl] = ln
+		end
+	end)
+end
+
+function removeEspFor(pl)
+	if espGuis[pl] then
+		pcall(function() espGuis[pl]:Destroy() end)
+		espGuis[pl] = nil
+	end
+	if tracerLines[pl] then
+		pcall(function() tracerLines[pl]:Remove() end)
+		tracerLines[pl] = nil
+	end
+end
+
+function syncEsp()
+	if config.normal.visual.esp.enabled then
+		for _,p in ipairs(Players:GetPlayers()) do
+			if p ~= LocalPlayer then
+				-- team filter
+				local allow = true
+				if config.normal.visual.esp.team ~= "Any" and LocalPlayer.Team and p.Team then
+					if config.normal.visual.esp.team == "Enemies" and p.Team == LocalPlayer.Team then allow = false end
+					if config.normal.visual.esp.team == "Team" and p.Team ~= LocalPlayer.Team then allow = false end
+				end
+				if allow and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then createEspFor(p) end
+			end
+		end
+	else
+		for p,_ in pairs(espGuis) do removeEspFor(p) end
+	end
+end
+
+Players.PlayerRemoving:Connect(function(pl) removeEspFor(pl) end)
+Players.PlayerAdded:Connect(function(pl) if config.normal.visual.esp.enabled then createEspFor(pl) end end)
+
+-- Money scanner: search workspace for objects with specific names
+function runMoneyScan()
+	local found = {}
+	local names = config.normal.utility.moneyscan.names or {}
+	for _, obj in ipairs(Workspace:GetDescendants()) do
+		if obj:IsA("BasePart") or obj:IsA("Model") then
+			for _, nm in ipairs(names) do
+				if obj.Name:lower():find(nm:lower()) then
+					table.insert(found, obj)
+					break
+				end
+			end
+		end
+	end
+	return found
+end
+
+-- Simple aimbot picking
+local function inFOV(screenPos, fov)
+	local cx, cy = workspace.CurrentCamera.ViewportSize.X/2, workspace.CurrentCamera.ViewportSize.Y/2
+	local dx, dy = screenPos.X - cx, screenPos.Y - cy
+	return math.sqrt(dx*dx + dy*dy) <= (fov/2)
+end
+
+local function isVisibleA(fromPos, toPos)
+	local params = RaycastParams.new()
+	params.FilterDescendantsInstances = {character}
+	params.FilterType = Enum.RaycastFilterType.Blacklist
+	local result = Workspace:Raycast(fromPos, toPos - fromPos, params)
+	return not result
+end
+
+local function pickAimbotTarget(cfg)
+	local cam = workspace.CurrentCamera
+	if not hrp or not cam then return nil end
+	local best, bestScore = nil, math.huge
+	for _,pl in ipairs(Players:GetPlayers()) do
+		if pl ~= LocalPlayer and pl.Character and pl.Character:FindFirstChild(cfg.targetPart) and pl.Character:FindFirstChild("Humanoid") and pl.Character.Humanoid.Health > 0 then
+			local tgt = pl.Character:FindFirstChild(cfg.targetPart)
+			local pos = tgt.Position
+			local screenPos, onScreen = cam:WorldToViewportPoint(pos)
+			if onScreen and inFOV(screenPos, cfg.fov) and (pos - hrp.Position).Magnitude <= (cfg.maxDistance or 9999) then
+				if cfg.requireVisible and not isVisibleA(cam.CFrame.Position, pos) then
+					-- skip
+				else
+					local score = (cfg.priority=="fov") and ((screenPos.X-cam.ViewportSize.X/2)^2 + (screenPos.Y-cam.ViewportSize.Y/2)^2) or (pos-hrp.Position).Magnitude
+					if score < bestScore then bestScore = score; best = tgt end
+				end
+			end
+		end
+	end
+	return best
+end
+
+-- ---------- INPUT hooks for Mouse Click TP ----------
+LocalPlayer:GetMouse().Button1Down:Connect(function()
+	tryClickTeleport(LocalPlayer:GetMouse())
+end)
+
+-- ---------- RENDER & HEARTBEAT ----------
+-- keep humanoid speed/jump applied, noclip maintained, floats & platform updated, ESP & tracers updated, aimbot
+RunService.Heartbeat:Connect(function(dt)
+	-- apply walk speed & jumppower
+	if humanoid then
+		if config.normal.movement.speed.enabled then
+			humanoid.WalkSpeed = config.normal.movement.speed.speed or config.normal.movement.speed.default
+		else
+			humanoid.WalkSpeed = config.normal.movement.speed.default
+		end
+		if config.normal.movement.jump.enabled then
+			if humanoid.JumpPower then humanoid.JumpPower = config.normal.movement.jump.power end
+		else
+			if humanoid.JumpPower then humanoid.JumpPower = config.normal.movement.jump.defaultPower end
+		end
+	end
+
+	-- enforce noclip continuously if enabled
+	if config.normal.utility.noclip.enabled and character then
+		for _, part in ipairs(character:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.CanCollide = false
+			end
+		end
+	end
+
+	-- floating platform follow logic
+	if floatPlatformPart and hrp then
+		local desiredPos = hrp.Position + (config.normal.utility.floatplatform.offset or Vector3.new(0,-3.1,0))
+		-- only move platform up if player moves up; otherwise keep its Y to lastPlatformY if set
+		if not lastPlatformY then lastPlatformY = desiredPos.Y end
+		if desiredPos.Y > lastPlatformY then
+			lastPlatformY = desiredPos.Y
+		end
+		floatPlatformPart.CFrame = CFrame.new(desiredPos.X, lastPlatformY, desiredPos.Z)
+	end
+
+	-- wallhack maintenance: if new parts appear, apply if enabled
+	if config.normal.visual.wallhack.enabled then
+		for _, part in ipairs(Workspace:GetDescendants()) do
+			if part:IsA("BasePart") and not part:IsDescendantOf(character) and not wallhackCache[part] then
+				wallhackCache[part] = { part.Transparency, part.CastShadow }
+				pcall(function() part.Transparency = config.normal.visual.wallhack.transparency or config.settings.wallhackTransparency; part.CastShadow = false end)
+			end
+		end
+	end
+end)
+
+-- RenderStepped for fly, aimbot, tracers & ESP updates
+RunService.RenderStepped:Connect(function(delta)
+	-- fly control (camera-relative)
+	if config.normal.movement.fly.enabled and hrp then
+		if not isFlying then setFly(true) end
+		local cam = workspace.CurrentCamera
+		local move = Vector3.new()
+		if UserInputService:IsKeyDown(Enum.KeyCode.W) then move = move + cam.CFrame.LookVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.S) then move = move - cam.CFrame.LookVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.A) then move = move - cam.CFrame.RightVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.D) then move = move + cam.CFrame.RightVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move = move + Vector3.new(0,1,0) end
+		if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then move = move - Vector3.new(0,1,0) end
+		if move.Magnitude > 0.01 then
+			flyBV.Velocity = move.Unit * (config.normal.movement.fly.speed or config.settings.flySpeed)
+		else
+			flyBV.Velocity = Vector3.new(0,0,0)
+		end
+		-- keep orientation stable
+		flyBG.CFrame = workspace.CurrentCamera.CFrame
+	else
+		if isFlying then setFly(false) end
+	end
+
+	-- aimbot
+	local aimCfg = config.normal.combat.aimbot
+	local aimActive = (aimCfg.keyMode=="hold" and aimHeld) or aimCfg.enabled
+	if aimActive and hrp and workspace.CurrentCamera then
+		if (tick() - lastAimTime) >= (1 / (aimCfg.maxAimPerSecond or 20)) then
+			lastAimTime = tick()
+			local tgt = pickAimbotTarget(aimCfg)
+			if tgt then
+				pcall(function()
+					local pos = tgt.Position
+					local phys = tgt.Parent and (tgt.Parent:FindFirstChild("HumanoidRootPart") or tgt.Parent:FindFirstChild("HumanoidRootPart"))
+					local vel = (phys and (phys.AssemblyLinearVelocity or phys.Velocity)) or Vector3.new(0,0,0)
+					local dist = (pos - workspace.CurrentCamera.CFrame.Position).Magnitude
+					local predicted = pos + vel * (aimCfg.prediction or 0) * math.clamp(dist/100, 0.2, 1.5)
+					local desired = (predicted - workspace.CurrentCamera.CFrame.Position).Unit
+					local cur = workspace.CurrentCamera.CFrame.LookVector
+					local s = math.clamp(aimCfg.smoothing or 0.18, 0, 1)
+					local newLook = cur:Lerp(desired, s)
+					workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, workspace.CurrentCamera.CFrame.Position + newLook)
+				end)
+			end
+		end
+	end
+
+	-- ESP sync & tracer update
+	if config.normal.visual.esp.enabled then
+		for _, pl in ipairs(Players:GetPlayers()) do
+			if pl ~= LocalPlayer and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") then
+				if not espGuis[pl] then createEspFor(pl) end
+			end
+		end
+	else
+		for p,_ in pairs(espGuis) do removeEspFor(p) end
+	end
+
+	if config.normal.visual.tracers.enabled and Drawing then
+		for pl,line in pairs(tracerLines) do
+			if pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") then
+				local pos = workspace.CurrentCamera:WorldToViewportPoint(pl.Character.HumanoidRootPart.Position)
+				if pos.Z > 0 then
+					line.From = Vector2.new(workspace.CurrentCamera.ViewportSize.X/2, workspace.CurrentCamera.ViewportSize.Y)
+					line.To = Vector2.new(pos.X, pos.Y)
+					line.Visible = true
+				else
+					line.Visible = false
+				end
+			else
+				line.Visible = false
+			end
+		end
+	end
+end)
+
+-- infinite jump
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed then return end
+	if config.normal.movement.infiniteJump.enabled and input.KeyCode == Enum.KeyCode.Space then
+		if humanoid and humanoid.Health > 0 then
+			humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+		end
+	end
+end)
+
+-- ---------- INITIALIZATION ----------
+-- create UI
+local menuGui = buildUI()
+
+-- persist after death: parent to CoreGui or PlayerGui and set ResetOnSpawn=false
+if not Testing then
+	-- coregui might restrict some ops; we used safeParent
+else
+	menuGui.Parent = PlayerGui
+end
+
+-- keep GUI visible after respawn by reparenting if needed
+LocalPlayer.CharacterAdded:Connect(function()
+	wait(0.5)
+	if Testing then
+		if menuGui.Parent ~= PlayerGui then safeParent(menuGui, PlayerGui) end
+	else
+		if menuGui.Parent ~= guiParent then safeParent(menuGui, guiParent) end
+	end
+end)
+
+-- expose helper functions used in UI callbacks
+_G.DeathClient = _G.DeathClient or {}
+_G.DeathClient.config = config
+
+-- small utility to sync ESP (used by UI toggles)
+function syncEsp() -- forward declaration already used above; keep reference
+	syncEsp = syncEsp -- noop to satisfy environment (function exists above)
+end
+
+-- safe BindToClose (pcall)
+pcall(function()
+	game:BindToClose(function()
+		-- cleanup
+		applyWallhack(false)
+		applyNoclip(false)
+		setFly(false)
+		if floatPlatformPart then pcall(function() floatPlatformPart:Destroy() end) end
+	end)
+end)
+
+
+-- MORE MODS
+
+
+
+local antiCam = nil
+local fakeCam = nil
+
+local function toggleAntiSpectate(on)
+	if not workspace.CurrentCamera or not LocalPlayer.Character then return end
+
+	if on then
+		-- Create a fake camera
+		fakeCam = Instance.new("Camera")
+		fakeCam.CFrame = workspace.CurrentCamera.CFrame
+		workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable
+		workspace.CurrentCamera.CFrame = LocalPlayer.Character:WaitForChild("HumanoidRootPart").CFrame
+
+		-- Continuously assign random player to antiCam for server detection
+		antiCam = RunService.RenderStepped:Connect(function()
+			local players = Players:GetPlayers()
+			if #players < 2 then return end
+			local target
+			repeat
+				target = players[math.random(1, #players)]
+			until target ~= LocalPlayer and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+			-- Set server-facing camera (simulate your real camera) to a random player
+			workspace.CurrentCamera.CFrame = fakeCam.CFrame -- You actually see through fakeCam
+		end)
+	else
+		-- Remove anti-spectate
+		if antiCam then
+			antiCam:Disconnect()
+			antiCam = nil
+		end
+		if workspace.CurrentCamera and fakeCam then
+			workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+			workspace.CurrentCamera.CFrame = fakeCam.CFrame
+			fakeCam:Destroy()
+			fakeCam = nil
+		end
+	end
+end
+
+-- Toggle function via config or keybind
+local function handleToggle()
+	config.normal.utility.antispectate.enabled = not config.normal.utility.antispectate.enabled
+	toggleAntiSpectate(config.normal.utility.antispectate.enabled)
+end
+
+-- Keybind listener
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed then return end
+	if input.KeyCode == config.keybinds.antispectate then
+		handleToggle()
+	end
+end)
+
+-- Add Anti-Spectate to GUI
+featureButtons["antispectate"].button.MouseButton1Click:Connect(function()
+	toggleAntiSpectate(config.normal.utility.antispectate.enabled)
+end)
+
+
+
+print("Loaded Death Client "..Version)
