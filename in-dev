@@ -1,0 +1,139 @@
+local version = "V2.0.2"
+local testing = false
+
+local plr = game.Players.LocalPlayer
+local char = plr.Character or plr.CharacterAdded:Wait()
+local hum = char:WaitForChild("Humanoid")
+
+local defaultSpeed = hum.WalkSpeed
+local defaultJumpHeight = hum.JumpHeight
+local defaultJumpPower = hum.JumpPower
+
+local function checkJumpType()
+    return hum.UseJumpPower and "power" or "height"
+end
+
+local config = {
+    version = version,
+    prefix = "#",
+    testing = testing,
+
+    keybinds = {
+        speed = Enum.KeyCode.V,
+        jump = Enum.KeyCode.J
+    },
+
+    mods = {
+        movement = {
+            speed = {
+                enabled = false,
+                speed = 32,
+                default = defaultSpeed,
+                mode = "walkspeed"
+            },
+            jump = {
+                enabled = false,
+                type = checkJumpType(),
+                height = 10,
+                power = 100,
+                defaultHeight = defaultJumpHeight,
+                defaultPower = defaultJumpPower
+            }
+        }
+    },
+
+    theme = {
+        textColor = Color3.fromRGB(0,0,0),
+        btnBackgroundColor = Color3.fromRGB(255,0,0),
+        backgroundColor = Color3.fromRGB(25,25,25),
+        tabBtnBackgroundColor = Color3.fromRGB(0,0,0),
+        tabBtnBorderColor = Color3.fromRGB(255,0,0),
+        tabBtnTextColor = Color3.fromRGB(255,0,0),
+        tabBorderSize = 3
+    }
+}
+
+local movement = config.mods.movement
+
+(function createGui()
+    local base = Instance.new("ScreenGui")
+    base.Parent = config.testing
+        and plr:WaitForChild("PlayerGui")
+        or game:GetService("CoreGui")
+
+    -- UI Scale
+    local uiScale = Instance.new("UIScale")
+    uiScale.Scale = config.theme.uiScale or 1
+    uiScale.Parent = base
+
+    -- main frame
+    local main = Instance.new("Frame")
+    main.Name = "Main"
+    main.Size = UDim2.new(0, 420, 0, 540)
+    main.Position = UDim2.new(0.5, -210, 0.5, -270)
+    main.BackgroundColor3 = config.theme.backgroundColor
+    main.BorderSizePixel = 0
+    main.Active = true
+    main.Draggable = true
+    main.Parent = base
+
+    Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+
+    local modFrame = Instance.new("Frame")
+    modFrame.Name = "ModFrame"
+    modFrame.Size = UDim2.new(1, 0, 1, -60) -- leaves 60px at top
+    modFrame.Position = UDim2.new(0, 0, 0, 60)
+    modFrame.Parent = mainFrame
+
+    -- List for toggles
+    local modList = Instance.new("UIListLayout")
+    modList.Padding = UDim.new(0, 8)
+    modList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    modList.SortOrder = Enum.SortOrder.LayoutOrder
+    modList.Parent = modFrame
+
+    local padding = Instance.new("UIPadding")
+    padding.PaddingTop = UDim.new(0, 12)
+    padding.PaddingBottom = UDim.new(0, 12)
+    padding.PaddingLeft = UDim.new(0, 12)
+    padding.PaddingRight = UDim.new(0, 12)
+    padding.Parent = modFrame
+
+    local tabs = {}
+
+    function addTab(displayName: string)
+        local newTab = Instance.new("TextButton")
+        newTab.Name = name
+        newTab.Text = name
+        newTab.Size = UDim2.new(0, 100, 0, 40)
+        newTab.BackgroundColor3 = config.theme.tabBtnBackgroundColor
+        newTab.BorderSizePixel = config.theme.tabBorderSize
+        newTab.BorderColor3 = config.theme.tabBtnBorderColor
+        newTab.TextColor3 = config.theme.tabBtnTextColor
+        newTab.Parent = main
+
+        local tabFrame = Instance.new("Frame")
+        tabFrame.Name = displayName
+        tabFrame.Size = UDim2.new(1, 0, 1, -60)
+        tabFrame.Position = UDim2.new(0, 0, 0, 60)
+        tabFrame.BackgroundColor3 = config.theme.backgroundColor
+        tabFrame.Visible = false
+        tabFrame.Parent = main
+
+        tabs[name] = tabFrame
+
+        newTab.MouseButton1Click:Connect(function()
+            for _, frame in pairs(tabs) do
+                frame.Visible = false
+            end
+            tabFrame.Visible = true
+        end)
+    end
+
+
+    function changeTab(newTab: String)
+        modFrame.Size = UDim2.new(1, 0, 1, -60)
+    end
+
+end)()
+
