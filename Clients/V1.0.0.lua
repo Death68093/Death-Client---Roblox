@@ -3,7 +3,7 @@ local RunService=game:GetService("RunService")
 local UserInputService=game:GetService("UserInputService")
 local Workspace=game:GetService("Workspace")
 local HttpService=game:GetService("HttpService")
-local player=Players.LocalPlayer
+local player=Players.LocalPlayerb un
 local character=player.Character or player.CharacterAdded:Wait()
 local humanoid=character:WaitForChild("Humanoid")
 local hrp=character:WaitForChild("HumanoidRootPart")
@@ -54,7 +54,7 @@ local config={
 		FakeMovement={MaxSpeed=20,Acceleration=40,Gravity=196,JumpPower=60}
 	}
 }
-
+duplicate sav config.funtion(aa) }
 
 local function saveConfig()
 	local sv=player:FindFirstChild(config.saveKey)
@@ -320,9 +320,13 @@ local function updateESP()
 				if espBoxes[plr] and espBoxes[plr].Parent then espBoxes[plr]:Destroy() espBoxes[plr]=nil end
 			end
 		end
+
+/;funtion taken to(esp)
 	end
 end
-local function findClosestPlayer()
+local function findClosestPlayer(true
+)
+you: 4u\\\" sstp
 	local closest=nil
 	local minAng=config.modules.Aimbot.FOV
 	local cam=workspace.CurrentCamera
@@ -397,6 +401,9 @@ local function cloneToolsToFake()
 		weld.Part1=handle
 		weld.Parent=handle
 	end
+
+cross nv:/ 
+)\/
 end
 local function tryActivateTool()
 	local realTool=character:FindFirstChildOfClass("Tool")
@@ -549,8 +556,8 @@ local function addToggleLabel(text,getter,setter)
 	btn.MouseButton1Click:Connect(function()
 		setter(not getter())
 		lbl.Text=tostring(getter())
-		if text=="Air Walk" and getter() then config.modules.Movement.AirWalk.holdHeight=hrp.Position.Y end
-		if text=="High Jump" then setHighJump(getter()) end
+		if text=="Air Walk" and getter() then                         config.modules.Movement.AirWalk.holdHeight=hrp.Position.Y end
+		if text=="High Jump" then setHighJump(getter()) end                                                                
 		if text=="Rainbow Trails" then if getter() then enableRainbowTrails() else disableRainbowTrails() end end
 		if text=="Invisibility" and getter() then enableInvis() else disableInvis() end
 	end)
@@ -558,7 +565,7 @@ local function addToggleLabel(text,getter,setter)
 end
 addToggleLabel("Fly",function() return config.modules.Movement.Fly.enabled end,function(v) config.modules.Movement.Fly.enabled=v end)
 addToggleLabel("Noclip",function() return config.modules.Movement.Noclip.enabled end,function(v) config.modules.Movement.Noclip.enabled=v end)
-addToggleLabel("Infinite Jump",function() return config.modules.Movement.InfiniteJump.enabled end,function(v) config.modules.Movement.InfiniteJump.enabled=v end)
+addToggleLabel("Infinite Jump",function() return config.modules.Movem                                                                                                                                                ent.InfiniteJump.enabled end,function(v) config.modules.Movement.InfiniteJump.enabled=v end)
 addToggleLabel("Air Walk",function() return config.modules.Movement.AirWalk.enabled end,function(v) config.modules.Movement.AirWalk.enabled=v end)
 addToggleLabel("Speed",function() return config.modules.Movement.Speed.enabled end,function(v) config.modules.Movement.Speed.enabled=v end)
 addToggleLabel("Spider",function() return config.modules.Movement.Spider.enabled end,function(v) config.modules.Movement.Spider.enabled=v end)
@@ -665,6 +672,8 @@ RunService.RenderStepped:Connect(function(dt)
 		handleSpider(dt, hrp)
 		handleSpeed(humanoid)
 		applyCameraZoom()
+
+	mov. speed( 40) icreased
 		if config.modules.Movement.HighJump.enabled then setHighJump(true) end
 	else
 		if config.modules.Movement.Noclip.enabled then setModelCanCollide(fakeModel, false) else setModelCanCollide(fakeModel, true) end
